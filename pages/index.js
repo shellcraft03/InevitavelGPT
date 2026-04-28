@@ -1,12 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
 
-export default function Home() {
-  const [q, setQ] = useState('');
-  const [answer, setAnswer] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState(null);
+export default function Entry() {
   const widgetIdRef = useRef(null);
   const turnstileResolve = useRef(null);
+  const router = useRouter();
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -15,13 +14,15 @@ export default function Home() {
         widgetIdRef.current = window.turnstile.render('#turnstile-container', {
           sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
           callback: (token) => {
-            setTurnstileToken(token);
+            sessionStorage.setItem('turnstileToken', token);
             if (turnstileResolve.current) {
               turnstileResolve.current(token);
               turnstileResolve.current = null;
             }
+            router.push('/qa');
           }
         });
+        setReady(true);
       }
       return;
     }
@@ -35,61 +36,38 @@ export default function Home() {
         widgetIdRef.current = window.turnstile.render('#turnstile-container', {
           sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
           callback: (token) => {
-            setTurnstileToken(token);
+            sessionStorage.setItem('turnstileToken', token);
             if (turnstileResolve.current) {
               turnstileResolve.current(token);
               turnstileResolve.current = null;
             }
+            router.push('/qa');
           }
         });
+        setReady(true);
       }
     };
     document.body.appendChild(s);
-  }, []);
+  }, [router]);
 
-  async function ask() {
-    if (!q.trim()) return;
-    setLoading(true);
-    if (!turnstileToken) {
-      if (window.turnstile && widgetIdRef.current != null) {
-        await new Promise((resolve) => { turnstileResolve.current = resolve; window.turnstile.execute(widgetIdRef.current); });
-      } else {
-        setLoading(false);
-        return alert('Turnstile not ready');
-      }
+  async function execute() {
+    if (window.turnstile && widgetIdRef.current != null) {
+      await new Promise((resolve) => { turnstileResolve.current = resolve; window.turnstile.execute(widgetIdRef.current); });
+    } else {
+      alert('Turnstile not ready');
     }
-
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: q, turnstileToken })
-    });
-    const data = await res.json();
-    setAnswer(data);
-    setLoading(false);
   }
 
   return (
     <main style={{ padding: 20, fontFamily: 'Arial, sans-serif' }}>
-      <h1>Livro Amarelo — Q&A</h1>
+      <h1>Bem-vindo — Verificação necessária</h1>
+      <p>Por favor, prove que você não é um robô para acessar a página de perguntas e respostas.</p>
 
-      <section style={{ marginTop: 20 }}>
-        <h2>Question</h2>
-        <input value={q} onChange={e => setQ(e.target.value)} style={{ width: 600 }} />
-        <div style={{ marginTop: 8 }}>
-          <button onClick={ask} disabled={loading}>Ask</button>
-        </div>
-        <div id="turnstile-container" style={{ marginTop: 12 }} />
-      </section>
+      <div id="turnstile-container" style={{ marginTop: 12 }} />
 
-      {answer && (
-        <section style={{ marginTop: 20 }}>
-          <h2>Answer</h2>
-          <div style={{ whiteSpace: 'pre-wrap', border: '1px solid #ddd', padding: 12 }}>
-            {answer.text}
-          </div>
-        </section>
-      )}
+      <div style={{ marginTop: 12 }}>
+        <button onClick={execute} disabled={!ready}>Verificar e Entrar</button>
+      </div>
     </main>
   );
 }
