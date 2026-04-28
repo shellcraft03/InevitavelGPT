@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { checkRateLimit } from '../../lib/rateLimiter.js';
+import { queryEmbedding } from '../../lib/vectorStore.js';
 
 const client = new OpenAI({ apiKey: process.env.CUSTOM_OPENAI_API_KEY || process.env.OPENAI_API_KEY });
 
@@ -33,7 +34,34 @@ export default async function handler(req, res) {
     const ok = await verifyTurnstile(turnstileToken);
     if (!ok) return res.status(403).json({ error: 'Turnstile verification failed' });
 
-    const systemPrompt = `You are a helpful assistant. Answer the user's question concisely. If you rely on the hosted book, indicate that you used it and cite pages/chapters when possible.`;
+    // If RAG enabled, retrieve relevant chunks and include as context
+    if (process.env.USE_RAG === 'true') {
+      const emb = await client.embeddings.create({ model: 'text-embedding-3-small', input: question });
+      const qvec = emb.data[0].embedding;
+      const top = await queryEmbedding(qvec, 6);
+
+      const contextText = top.map((t, i) => `Source ${i + 1} - ${t.meta?.file || 'unknown'}:page=${t.meta?.page} (score=${t.score?.toFixed(3)}):\n${t.text}\n---\n`).join('\n');
+
+      const systemPrompt = `You are a helpful assistant that answers questions using the provided context. Provide a concise answer and cite sources by "Source N" with file and page where applicable. If the answer is not present in the context, say you don't know.`;
+
+      const userPrompt = `Context:\n${contextText}\nQuestion: ${question}\nAnswer:`;
+
+      const chat = await client.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        max_tokens: 800
+      });
+
+      const text = chat.choices?.[0]?.message?.content || '';
+      const sources = top.map((t, i) => ({ source: `Source ${i+1}`, file: t.meta?.file, page: t.meta?.page, score: t.score }));
+      return res.json({ text, sources });
+    }
+
+    // Fallback: direct chat through custom app key
+    const systemPrompt = `You are a helpful assistant. Answer the user's question concisely.`;
 
     const chat = await client.chat.completions.create({
       model: 'gpt-4o-mini',
