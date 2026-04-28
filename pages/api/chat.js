@@ -42,7 +42,7 @@ export default async function handler(req, res) {
 
       const contextText = top.map((t, i) => `Source ${i + 1} - ${t.meta?.file || 'unknown'}:page=${t.meta?.page} (score=${t.score?.toFixed(3)}):\n${t.text}\n---\n`).join('\n');
 
-      const systemPrompt = `You are a helpful assistant that answers questions using the provided context. Provide a concise answer and cite sources by "Source N" with file and page where applicable. If the answer is not present in the context, say you don't know.`;
+      const systemPrompt = `Esse modelo devera responder perguntas somente com base no arquivo pdf. Ele deverá citar o capitulo e a pagina como fonte, se possível. O Texto de retorno deverá ser separado por paragrafos de no maximo 140 caracteres para que possa ser copiado e colado em uma thread do twitter. Caso seja feita uma pergunta que não tem nada a ver com o texto, deverá ser retornada uma mensagem informando que a pergunta não faz parte do escopo ou que não existe informações sobre a pergunta.`;
 
       const userPrompt = `Context:\n${contextText}\nQuestion: ${question}\nAnswer:`;
 
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
     }
 
     // Fallback: direct chat through custom app key
-    const systemPrompt = `You are a helpful assistant. Answer the user's question concisely.`;
+    const systemPrompt = `Esse modelo devera responder perguntas somente com base no arquivo pdf. Ele deverá citar o capitulo e a pagina como fonte, se possível. O Texto de retorno deverá ser separado por paragrafos de no maximo 140 caracteres para que possa ser copiado e colado em uma thread do twitter. Caso seja feita uma pergunta que não tem nada a ver com o texto, deverá ser retornada uma mensagem informando que a pergunta não faz parte do escopo ou que não existe informações sobre a pergunta.`;
 
     const chat = await client.chat.completions.create({
       model: 'gpt-4o-mini',
