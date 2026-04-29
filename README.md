@@ -113,7 +113,11 @@ USE_RAG=true
 # REDIS_URL=redis://...
 ```
 
-> **Atenção:** o projeto OpenAI precisa ter acesso ao modelo `text-embedding-3-small`. Verifique em *platform.openai.com → Projects → Model access*.
+> **Atenção:** o projeto OpenAI precisa ter acesso a dois modelos:
+> - `text-embedding-3-small` — para geração de embeddings na indexação e nas consultas
+> - `gpt-4.1-mini` — para geração de respostas em linguagem natural
+>
+> Verifique em *platform.openai.com → Projects → Model access*. Os modelos acima são os padrões utilizados, mas o desenvolvedor pode substituí-los pelos modelos de sua preferência editando as variáveis `EMBEDDING_MODEL` e o campo `model` em `pages/api/chat.js`.
 
 ### 3. Indexar o documento
 
