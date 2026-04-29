@@ -1,76 +1,46 @@
 import { useState, useEffect, useRef } from 'react';
+import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { useTurnstile } from '../hooks/useTurnstile';
+
+const MAX_QUESTION_LENGTH = 1000;
+
+const SUGGESTIONS = [
+  'Quais são as propostas para a saúde?',
+  'O que o plano diz sobre educação?',
+  'Como será tratada a segurança urbana?',
+  'Quais as propostas de mobilidade urbana?',
+];
 
 export default function QA() {
   const [q, setQ] = useState('');
   const [answer, setAnswer] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [askedQuestion, setAskedQuestion] = useState('');
   const router = useRouter();
+  const inputRef = useRef(null);
+  const answerRef = useRef(null);
 
-  const widgetIdRef = useRef(null);
-  const turnstileResolve = useRef(null);
+  const { getFreshToken } = useTurnstile('turnstile-container-qa');
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? sessionStorage.getItem('turnstileToken') : null;
-    if (!token) {
-      router.replace('/');
-      return;
-    }
-
-    // Load Turnstile on this page so we can request a fresh token per question
-    if (typeof window === 'undefined') return;
-    if (window.turnstile) {
-      if (!widgetIdRef.current) {
-        widgetIdRef.current = window.turnstile.render('#turnstile-container-qa', {
-          sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
-          callback: (t) => {
-            if (turnstileResolve.current) {
-              turnstileResolve.current(t);
-              turnstileResolve.current = null;
-            }
-          }
-        });
-      }
-      return;
-    }
-
-    const s = document.createElement('script');
-    s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
-    s.async = true;
-    s.defer = true;
-    s.onload = () => {
-      if (window.turnstile && !widgetIdRef.current) {
-        widgetIdRef.current = window.turnstile.render('#turnstile-container-qa', {
-          sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
-          callback: (t) => {
-            if (turnstileResolve.current) {
-              turnstileResolve.current(t);
-              turnstileResolve.current = null;
-            }
-          }
-        });
-      }
-    };
-    document.body.appendChild(s);
+    if (!token) router.replace('/');
   }, [router]);
 
-  async function getFreshTurnstileToken() {
-    if (typeof window === 'undefined' || !window.turnstile || widgetIdRef.current == null) {
-      return null;
-    }
-    return await new Promise((resolve) => { turnstileResolve.current = resolve; window.turnstile.execute(widgetIdRef.current); });
-  }
+  async function ask(question) {
+    const text = (question ?? q).trim().slice(0, MAX_QUESTION_LENGTH);
+    if (!text || loading) return;
 
-  async function ask() {
-    if (!q.trim()) return;
     setLoading(true);
+    setAskedQuestion(text);
+    setAnswer(null);
 
-    // Request a fresh token for this question (Turnstile tokens are single-use/short-lived)
-    const freshToken = await getFreshTurnstileToken();
+    const freshToken = await getFreshToken();
     if (!freshToken) {
       setLoading(false);
       sessionStorage.removeItem('turnstileToken');
-      alert('Não foi possível obter token de verificação. Você será redirecionado para verificar novamente.');
+      alert('Verificação expirou. Você será redirecionado.');
       router.replace('/');
       return;
     }
@@ -78,43 +48,474 @@ export default function QA() {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: q, turnstileToken: freshToken })
+      body: JSON.stringify({ question: text, turnstileToken: freshToken })
     });
+
     if (res.status === 403) {
-      // token invalid/expired/secret missing — require re-verification
       sessionStorage.removeItem('turnstileToken');
-      alert('Verificação falhou ou expirou. Você será redirecionado para verificar novamente.');
+      alert('Verificação falhou ou expirou. Você será redirecionado.');
       router.replace('/');
       return;
     }
+
     const data = await res.json();
     setAnswer(data);
     setLoading(false);
+    setTimeout(() => answerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   }
 
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      ask();
+    }
+  }
+
+  function useSuggestion(s) {
+    setQ(s);
+    ask(s);
+  }
+
+  function resetQuestion() {
+    setAnswer(null);
+    setQ('');
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }
+
+  const sources = (answer?.sources || []).filter(s => s.score > 0.1);
+
   return (
-    <main style={{ padding: 20, fontFamily: 'Arial, sans-serif' }}>
-      <h1>Livro Amarelo — Q&A</h1>
+    <>
+      <Head>
+        <title>o Livro Amarelo — Q&A</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </Head>
 
-      <section style={{ marginTop: 20 }}>
-        <h2>Question</h2>
-        <input value={q} onChange={e => setQ(e.target.value)} style={{ width: 600 }} />
-        <div style={{ marginTop: 8 }}>
-          <button onClick={ask} disabled={loading}>Ask</button>
-        </div>
-      </section>
+      <div style={s.page}>
 
-      {answer && (
-        <section style={{ marginTop: 20 }}>
-          <h2>Answer</h2>
-          <div style={{ whiteSpace: 'pre-wrap', border: '1px solid #ddd', padding: 12 }}>
-            {answer.text}
+        {/* ── Header ── */}
+        <header style={s.header}>
+          <div style={s.headerInner}>
+            <a href="/" style={s.headerLogo}>
+              <img src="/cover.png" alt="" style={s.headerThumb} />
+              <div>
+                <div style={s.headerTitle}>o Livro Amarelo</div>
+                <div style={s.headerSub}>Programa de Governo · Arthur do Val</div>
+              </div>
+            </a>
+            <span style={s.badge}>Q&A</span>
           </div>
-        </section>
-      )}
+        </header>
 
-      {/* Hidden Turnstile widget used to execute per-request tokens */}
-      <div id="turnstile-container-qa" style={{ display: 'none' }} />
-    </main>
+        {/* ── Main ── */}
+        <main style={s.main}>
+
+          {/* Input card */}
+          <div style={s.inputCard}>
+            <label style={s.inputLabel}>Faça uma pergunta sobre o programa de governo</label>
+            <div style={s.inputRow}>
+              <input
+                ref={inputRef}
+                value={q}
+                onChange={e => setQ(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ex: Quais são as propostas para a saúde?"
+                maxLength={MAX_QUESTION_LENGTH}
+                disabled={loading}
+                style={s.input}
+              />
+              <button
+                onClick={() => ask()}
+                disabled={loading || !q.trim()}
+                style={(loading || !q.trim()) ? s.btnDisabled : s.btnActive}
+              >
+                {loading ? '…' : 'Perguntar'}
+              </button>
+            </div>
+          </div>
+
+          {/* Suggestions */}
+          {!answer && !loading && (
+            <div style={s.suggestSection}>
+              <p style={s.suggestLabel}>Sugestões</p>
+              <div style={s.suggestList}>
+                {SUGGESTIONS.map((sug, i) => (
+                  <button key={i} onClick={() => useSuggestion(sug)} style={s.suggestBtn}>
+                    {sug}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Loading */}
+          {loading && (
+            <div style={s.loadingWrap}>
+              <div style={s.loadingBar}>
+                <span style={{ ...s.loadingDot, animationDelay: '0ms' }} />
+                <span style={{ ...s.loadingDot, animationDelay: '180ms' }} />
+                <span style={{ ...s.loadingDot, animationDelay: '360ms' }} />
+              </div>
+              <p style={s.loadingText}>Buscando no programa de governo…</p>
+            </div>
+          )}
+
+          {/* Answer */}
+          {answer && !loading && (
+            <div style={s.answerCard} ref={answerRef}>
+
+              {/* Question recap */}
+              <div style={s.qRecap}>
+                <span style={s.qRecapLabel}>Pergunta</span>
+                <p style={s.qRecapText}>"{askedQuestion}"</p>
+              </div>
+
+              <div style={s.answerDivider} />
+
+              {/* Answer */}
+              <div style={s.answerHeader}>
+                <span style={s.answerTag}>Resposta</span>
+              </div>
+              <div style={s.answerText}>{answer.text}</div>
+
+              {/* Sources */}
+              {sources.length > 0 && (
+                <div style={s.sourcesWrap}>
+                  <p style={s.sourcesLabel}>Fontes citadas</p>
+                  <div style={s.sourcesList}>
+                    {sources.map((src, i) => (
+                      <span key={i} style={s.sourceBadge}>
+                        {src.file?.replace('.pdf', '') || 'documento'} · pág. {src.page}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* New question */}
+              <div style={s.newQRow}>
+                <button onClick={resetQuestion} style={s.newQBtn}>
+                  ← Nova pergunta
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Welcome */}
+          {!answer && !loading && (
+            <div style={s.welcome}>
+              <img src="/cover.png" alt="" style={s.welcomeImg} />
+              <p style={s.welcomeText}>
+                Explore o Plano de Governo de Arthur do Val para São Paulo.
+              </p>
+            </div>
+          )}
+
+        </main>
+
+        <div id="turnstile-container-qa" style={{ display: 'none' }} />
+      </div>
+    </>
   );
 }
+
+const s = {
+  page: {
+    minHeight: '100vh',
+    background: '#F2F2F2',
+    display: 'flex',
+    flexDirection: 'column',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  },
+
+  /* ── Header ── */
+  header: {
+    background: '#000000',
+    position: 'sticky',
+    top: 0,
+    zIndex: 100,
+  },
+  headerInner: {
+    maxWidth: '800px',
+    margin: '0 auto',
+    padding: '12px 24px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerLogo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    textDecoration: 'none',
+  },
+  headerThumb: {
+    width: '36px',
+    height: '36px',
+    objectFit: 'cover',
+    borderRadius: '4px',
+    background: '#FCBF22',
+  },
+  headerTitle: {
+    color: '#FCBF22',
+    fontSize: '1rem',
+    fontWeight: 900,
+    letterSpacing: '-0.03em',
+  },
+  headerSub: {
+    color: '#666666',
+    fontSize: '0.68rem',
+    fontWeight: 500,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    marginTop: '1px',
+  },
+  badge: {
+    background: '#FCBF22',
+    color: '#000000',
+    borderRadius: '4px',
+    padding: '3px 10px',
+    fontSize: '0.7rem',
+    fontWeight: 800,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+
+  /* ── Main ── */
+  main: {
+    maxWidth: '800px',
+    width: '100%',
+    margin: '0 auto',
+    padding: '32px 24px 80px',
+    flex: 1,
+  },
+
+  /* Input */
+  inputCard: {
+    background: '#FFFFFF',
+    borderRadius: '12px',
+    padding: '24px',
+    marginBottom: '20px',
+    border: '2px solid #000000',
+  },
+  inputLabel: {
+    display: 'block',
+    fontSize: '0.8rem',
+    fontWeight: 700,
+    color: '#000000',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    marginBottom: '12px',
+  },
+  inputRow: {
+    display: 'flex',
+    gap: '10px',
+  },
+  input: {
+    flex: 1,
+    padding: '12px 16px',
+    border: '2px solid #000000',
+    borderRadius: '8px',
+    fontSize: '0.95rem',
+    outline: 'none',
+    color: '#000000',
+    background: '#FFFFFF',
+  },
+  btnActive: {
+    padding: '12px 22px',
+    background: '#FCBF22',
+    color: '#000000',
+    border: '2px solid #000000',
+    borderRadius: '8px',
+    fontSize: '0.95rem',
+    fontWeight: 800,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+  },
+  btnDisabled: {
+    padding: '12px 22px',
+    background: '#F2F2F2',
+    color: '#999999',
+    border: '2px solid #F2F2F2',
+    borderRadius: '8px',
+    fontSize: '0.95rem',
+    fontWeight: 800,
+    cursor: 'not-allowed',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+  },
+
+  /* Suggestions */
+  suggestSection: {
+    marginBottom: '28px',
+  },
+  suggestLabel: {
+    fontSize: '0.68rem',
+    fontWeight: 700,
+    color: '#666666',
+    textTransform: 'uppercase',
+    letterSpacing: '0.1em',
+    marginBottom: '10px',
+  },
+  suggestList: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+  },
+  suggestBtn: {
+    padding: '8px 14px',
+    background: '#FFFFFF',
+    border: '2px solid #000000',
+    borderRadius: '20px',
+    fontSize: '0.85rem',
+    color: '#000000',
+    cursor: 'pointer',
+    fontWeight: 600,
+  },
+
+  /* Loading */
+  loadingWrap: {
+    background: '#FFFFFF',
+    borderRadius: '12px',
+    padding: '48px 24px',
+    border: '2px solid #000000',
+    textAlign: 'center',
+    animation: 'fadeIn 0.3s ease',
+  },
+  loadingBar: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '8px',
+    marginBottom: '16px',
+  },
+  loadingDot: {
+    width: '12px',
+    height: '12px',
+    borderRadius: '50%',
+    background: '#FCBF22',
+    border: '2px solid #000000',
+    display: 'inline-block',
+    animation: 'pulse 1.2s ease-in-out infinite',
+  },
+  loadingText: {
+    color: '#666666',
+    fontSize: '0.9rem',
+    fontWeight: 500,
+  },
+
+  /* Answer */
+  answerCard: {
+    background: '#FFFFFF',
+    borderRadius: '12px',
+    padding: '28px',
+    border: '2px solid #000000',
+    animation: 'fadeIn 0.4s ease',
+  },
+  qRecap: {
+    marginBottom: '20px',
+  },
+  qRecapLabel: {
+    fontSize: '0.68rem',
+    fontWeight: 700,
+    color: '#FFFFFF',
+    background: '#000000',
+    textTransform: 'uppercase',
+    letterSpacing: '0.1em',
+    display: 'inline-block',
+    padding: '3px 8px',
+    borderRadius: '4px',
+    marginBottom: '8px',
+  },
+  qRecapText: {
+    color: '#333333',
+    fontSize: '0.95rem',
+    fontStyle: 'italic',
+    lineHeight: 1.5,
+  },
+  answerDivider: {
+    height: '2px',
+    background: '#FCBF22',
+    marginBottom: '20px',
+  },
+  answerHeader: {
+    marginBottom: '14px',
+  },
+  answerTag: {
+    fontSize: '0.68rem',
+    fontWeight: 700,
+    color: '#000000',
+    background: '#FCBF22',
+    textTransform: 'uppercase',
+    letterSpacing: '0.1em',
+    display: 'inline-block',
+    padding: '3px 8px',
+    borderRadius: '4px',
+  },
+  answerText: {
+    color: '#111111',
+    lineHeight: 1.8,
+    whiteSpace: 'pre-wrap',
+    fontSize: '0.95rem',
+  },
+  sourcesWrap: {
+    marginTop: '24px',
+    paddingTop: '20px',
+    borderTop: '2px solid #F2F2F2',
+  },
+  sourcesLabel: {
+    fontSize: '0.68rem',
+    fontWeight: 700,
+    color: '#666666',
+    textTransform: 'uppercase',
+    letterSpacing: '0.1em',
+    marginBottom: '10px',
+  },
+  sourcesList: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '6px',
+  },
+  sourceBadge: {
+    padding: '4px 12px',
+    background: '#FCBF22',
+    border: '2px solid #000000',
+    borderRadius: '20px',
+    fontSize: '0.75rem',
+    color: '#000000',
+    fontWeight: 700,
+  },
+  newQRow: {
+    marginTop: '20px',
+    paddingTop: '16px',
+    borderTop: '2px solid #F2F2F2',
+  },
+  newQBtn: {
+    background: 'none',
+    border: '2px solid #000000',
+    borderRadius: '8px',
+    color: '#000000',
+    fontSize: '0.85rem',
+    cursor: 'pointer',
+    padding: '8px 16px',
+    fontWeight: 700,
+  },
+
+  /* Welcome */
+  welcome: {
+    textAlign: 'center',
+    padding: '48px 24px 0',
+  },
+  welcomeImg: {
+    width: '200px',
+    maxWidth: '60%',
+    display: 'block',
+    margin: '0 auto 20px',
+    opacity: 0.6,
+  },
+  welcomeText: {
+    fontSize: '0.95rem',
+    color: '#666666',
+    lineHeight: 1.6,
+  },
+};
