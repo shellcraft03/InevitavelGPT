@@ -66,7 +66,7 @@ export default async function handler(req, res) {
       const userPrompt = `Context:\n${contextText}\nQuestion: """${question}"""\nAnswer:`;
 
       const chat = await client.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-mini',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userPrompt }
@@ -81,7 +81,7 @@ export default async function handler(req, res) {
 
     // Fallback: direct chat without RAG context
     const chat = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-mini',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: `Question: """${question}"""\nAnswer:` }
