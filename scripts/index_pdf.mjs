@@ -1,0 +1,93 @@
+import fs from 'fs/promises';
+import path from 'path';
+import pdf from 'pdf-parse';
+import OpenAI from 'openai';
+import { addItems, clearStore } from '../lib/vectorStore.js';
+import { chunkText } from '../lib/chunker.js';
+
+// Load environment from .env.local (must be awaited so OPENAI_API_KEY is set before use)
+try { await import('dotenv').then(d => d.config({ path: '.env.local' })); } catch (e) {}
+
+async function indexPdf(filePath, title = null) {
+  const data = await fs.readFile(filePath);
+  const parsed = await pdf(data);
+  const pages = (parsed.text || '').split(/\f/).map(p => p.trim()).filter(Boolean);
+
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+  const items = [];
+  for (let i = 0; i < pages.length; i++) {
+    const pageText = pages[i];
+    const pageChunks = chunkText(pageText, 1000);
+    for (let j = 0; j < pageChunks.length; j++) {
+      const text = pageChunks[j];
+      try {
+          // try configured embedding model(s)
+          const preferred = process.env.EMBEDDING_MODEL ? process.env.EMBEDDING_MODEL.split(',') : ['text-embedding-3-small'];
+          const alternatives = ['text-embedding-3-large', 'text-embedding-3-small', 'text-embedding-ada-002'];
+          const modelsToTry = [...new Set([...preferred, ...alternatives])];
+          let emb = null;
+          for (const m of modelsToTry) {
+            try {
+              emb = await client.embeddings.create({ model: m, input: text });
+              break;
+            } catch (e) {
+              // if model not available, try next
+              console.error(`embedding model ${m} failed:`, e.message || e);
+            }
+          }
+          let vector = null;
+          if (emb && emb.data && emb.data[0] && emb.data[0].embedding) {
+            vector = emb.data[0].embedding;
+          } else {
+            console.warn('No embedding created for chunk; storing text-only chunk for text-based search fallback');
+          }
+        items.push({ id: `${path.basename(filePath)}-${i}-${j}-${Date.now()}`, text, embedding: vector, meta: { file: path.basename(filePath), page: i+1, chunk: j, title } });
+      } catch (err) {
+        console.error('embedding error', err);
+      }
+    }
+  }
+
+  await addItems(items);
+  console.log(`Indexed ${items.length} chunks from ${filePath}`);
+}
+
+// CLI — supports --reindex flag to clear the store before indexing
+const rawArgs = process.argv.slice(2);
+const reindex = rawArgs.includes('--reindex');
+const args = rawArgs.filter(a => a !== '--reindex');
+
+async function indexFromArgs() {
+  if (reindex) {
+    console.log('--reindex: clearing existing store...');
+    await clearStore();
+  }
+
+  if (args.length === 0) {
+    const dir = path.join(process.cwd(), 'data', 'books');
+    try {
+      const files = await fs.readdir(dir);
+      const pdfs = files.filter(f => f.toLowerCase().endsWith('.pdf'));
+      if (pdfs.length === 0) {
+        console.log('No PDF files found in data/books');
+        return;
+      }
+      for (const p of pdfs) {
+        const full = path.join(dir, p);
+        console.log('Indexing', full);
+        await indexPdf(full, p.replace(/\.pdf$/i, ''));
+      }
+      return;
+    } catch (err) {
+      console.error('Failed to read data/books:', err);
+      process.exit(1);
+    }
+  }
+
+  const filePath = args[0];
+  const title = args[1] || null;
+  await indexPdf(filePath, title);
+}
+
+indexFromArgs().catch(err => { console.error(err); process.exit(1); });
