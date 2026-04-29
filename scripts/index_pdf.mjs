@@ -5,55 +5,104 @@ import OpenAI from 'openai';
 import { addItems, clearStore } from '../lib/vectorStore.js';
 import { chunkText } from '../lib/chunker.js';
 
-// Load environment from .env.local (must be awaited so OPENAI_API_KEY is set before use)
 try { await import('dotenv').then(d => d.config({ path: '.env.local' })); } catch (e) {}
+
+async function extractPages(data) {
+  const pageTexts = [];
+
+  const options = {
+    pagerender(pageData) {
+      return pageData.getTextContent({ normalizeWhitespace: true }).then(tc => {
+        let lastY = null;
+        let text = '';
+        for (const item of tc.items) {
+          if (lastY !== null && Math.abs(item.transform[5] - lastY) > 2) {
+            text += '\n';
+          }
+          text += item.str;
+          lastY = item.transform[5];
+        }
+        pageTexts.push(text);
+        return text;
+      });
+    }
+  };
+
+  await pdf(data, options);
+
+  // Fall back to form-feed split if pagerender yielded nothing
+  if (pageTexts.length === 0) {
+    const parsed = await pdf(data);
+    return (parsed.text || '').split(/\f/).map(p => p.trim()).filter(Boolean);
+  }
+
+  return pageTexts;
+}
 
 async function indexPdf(filePath, title = null) {
   const data = await fs.readFile(filePath);
-  const parsed = await pdf(data);
-  const pages = (parsed.text || '').split(/\f/).map(p => p.trim()).filter(Boolean);
+  const pages = await extractPages(data);
+  console.log(`Extracted ${pages.length} pages from ${path.basename(filePath)}`);
 
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const preferred = process.env.EMBEDDING_MODEL ? process.env.EMBEDDING_MODEL.split(',') : ['text-embedding-3-small'];
+  const alternatives = ['text-embedding-3-large', 'text-embedding-3-small', 'text-embedding-ada-002'];
+  const modelsToTry = [...new Set([...preferred, ...alternatives])];
+
+  // Preflight: find a working embedding model
+  let workingModel = null;
+  for (const m of modelsToTry) {
+    try {
+      await client.embeddings.create({ model: m, input: 'test' });
+      workingModel = m;
+      console.log(`Using embedding model: ${m}`);
+      break;
+    } catch (e) {
+      console.warn(`Model ${m} unavailable: ${e.message}`);
+    }
+  }
+  if (!workingModel) {
+    console.warn('No embedding model available — chunks will be stored without embeddings (text-match fallback only).');
+  }
 
   const items = [];
+  let totalChunks = 0;
+  let skipped = 0;
+
   for (let i = 0; i < pages.length; i++) {
     const pageText = pages[i];
-    const pageChunks = chunkText(pageText, 1000);
+    const pageChunks = chunkText(pageText, 600);
+
     for (let j = 0; j < pageChunks.length; j++) {
       const text = pageChunks[j];
-      try {
-          // try configured embedding model(s)
-          const preferred = process.env.EMBEDDING_MODEL ? process.env.EMBEDDING_MODEL.split(',') : ['text-embedding-3-small'];
-          const alternatives = ['text-embedding-3-large', 'text-embedding-3-small', 'text-embedding-ada-002'];
-          const modelsToTry = [...new Set([...preferred, ...alternatives])];
-          let emb = null;
-          for (const m of modelsToTry) {
-            try {
-              emb = await client.embeddings.create({ model: m, input: text });
-              break;
-            } catch (e) {
-              // if model not available, try next
-              console.error(`embedding model ${m} failed:`, e.message || e);
-            }
-          }
-          let vector = null;
-          if (emb && emb.data && emb.data[0] && emb.data[0].embedding) {
-            vector = emb.data[0].embedding;
-          } else {
-            console.warn('No embedding created for chunk; storing text-only chunk for text-based search fallback');
-          }
-        items.push({ id: `${path.basename(filePath)}-${i}-${j}-${Date.now()}`, text, embedding: vector, meta: { file: path.basename(filePath), page: i+1, chunk: j, title } });
-      } catch (err) {
-        console.error('embedding error', err);
+      totalChunks++;
+
+      let vector = null;
+      if (workingModel) {
+        try {
+          const emb = await client.embeddings.create({ model: workingModel, input: text });
+          vector = emb?.data?.[0]?.embedding ?? null;
+        } catch (e) {
+          console.error(`Embedding failed (page ${i + 1}, chunk ${j}):`, e.message);
+          skipped++;
+        }
       }
+
+      items.push({
+        id: `${path.basename(filePath)}-p${i + 1}-c${j}-${Date.now()}`,
+        text,
+        embedding: vector,
+        meta: { file: path.basename(filePath), page: i + 1, chunk: j, title }
+      });
+
+      process.stdout.write(`\r  page ${i + 1}/${pages.length} | chunk ${totalChunks} | skipped ${skipped}`);
     }
   }
 
+  console.log(`\nIndexed ${items.length} chunks (${skipped} without embeddings) from ${filePath}`);
   await addItems(items);
-  console.log(`Indexed ${items.length} chunks from ${filePath}`);
 }
 
-// CLI — supports --reindex flag to clear the store before indexing
 const rawArgs = process.argv.slice(2);
 const reindex = rawArgs.includes('--reindex');
 const args = rawArgs.filter(a => a !== '--reindex');
@@ -69,25 +118,18 @@ async function indexFromArgs() {
     try {
       const files = await fs.readdir(dir);
       const pdfs = files.filter(f => f.toLowerCase().endsWith('.pdf'));
-      if (pdfs.length === 0) {
-        console.log('No PDF files found in data/books');
-        return;
-      }
+      if (pdfs.length === 0) { console.log('No PDF files found in data/books'); return; }
       for (const p of pdfs) {
-        const full = path.join(dir, p);
-        console.log('Indexing', full);
-        await indexPdf(full, p.replace(/\.pdf$/i, ''));
+        await indexPdf(path.join(dir, p), p.replace(/\.pdf$/i, ''));
       }
-      return;
     } catch (err) {
       console.error('Failed to read data/books:', err);
       process.exit(1);
     }
+    return;
   }
 
-  const filePath = args[0];
-  const title = args[1] || null;
-  await indexPdf(filePath, title);
+  await indexPdf(args[0], args[1] || null);
 }
 
 indexFromArgs().catch(err => { console.error(err); process.exit(1); });
