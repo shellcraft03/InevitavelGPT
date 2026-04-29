@@ -2,30 +2,11 @@ import fs from 'fs/promises';
 import path from 'path';
 import pdf from 'pdf-parse';
 import OpenAI from 'openai';
-import { addItems } from '../lib/vectorStore.js';
+import { addItems, clearStore } from '../lib/vectorStore.js';
+import { chunkText } from '../lib/chunker.js';
 
-// Load environment from .env.local when present (allows running `node scripts/index_pdf.mjs`)
-try {
-  import('dotenv').then(d => d.config({ path: '.env.local' })).catch(() => {});
-} catch (e) {
-  // ignore
-}
-
-function chunkText(text, maxChars = 800) {
-  const paragraphs = text.split(/\n{2,}|\r\n{2,}/g).map(p => p.trim()).filter(Boolean);
-  const chunks = [];
-  let cur = '';
-  for (const p of paragraphs) {
-    if ((cur + '\n\n' + p).length > maxChars) {
-      if (cur) chunks.push(cur.trim());
-      cur = p;
-    } else {
-      cur = cur ? cur + '\n\n' + p : p;
-    }
-  }
-  if (cur) chunks.push(cur.trim());
-  return chunks;
-}
+// Load environment from .env.local (must be awaited so OPENAI_API_KEY is set before use)
+try { await import('dotenv').then(d => d.config({ path: '.env.local' })); } catch (e) {}
 
 async function indexPdf(filePath, title = null) {
   const data = await fs.readFile(filePath);
@@ -72,10 +53,17 @@ async function indexPdf(filePath, title = null) {
   console.log(`Indexed ${items.length} chunks from ${filePath}`);
 }
 
-// CLI
-const args = process.argv.slice(2);
-// If no args provided, index all PDFs in data/books
+// CLI — supports --reindex flag to clear the store before indexing
+const rawArgs = process.argv.slice(2);
+const reindex = rawArgs.includes('--reindex');
+const args = rawArgs.filter(a => a !== '--reindex');
+
 async function indexFromArgs() {
+  if (reindex) {
+    console.log('--reindex: clearing existing store...');
+    await clearStore();
+  }
+
   if (args.length === 0) {
     const dir = path.join(process.cwd(), 'data', 'books');
     try {

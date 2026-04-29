@@ -4,6 +4,10 @@ import pdf from 'pdf-parse';
 import OpenAI from 'openai';
 import { addItems } from '../../lib/vectorStore.js';
 import { checkRateLimit } from '../../lib/rateLimiter.js';
+import { verifyTurnstile } from '../../lib/turnstile.js';
+import { chunkText } from '../../lib/chunker.js';
+
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
 export const config = {
   api: {
@@ -11,92 +15,73 @@ export const config = {
   },
 };
 
-function chunkText(text, maxChars = 800) {
-  const paragraphs = text.split(/\n{2,}|\r\n{2,}/g).map(p => p.trim()).filter(Boolean);
-  const chunks = [];
-  let cur = '';
-  for (const p of paragraphs) {
-    if ((cur + '\n\n' + p).length > maxChars) {
-      if (cur) chunks.push(cur.trim());
-      cur = p;
-    } else {
-      cur = cur ? cur + '\n\n' + p : p;
-    }
-  }
-  if (cur) chunks.push(cur.trim());
-  return chunks;
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const form = new formidable.IncomingForm();
+  const form = new formidable.IncomingForm({ maxFileSize: MAX_FILE_SIZE });
 
-  const parsed = await new Promise((resolve, reject) => {
-    form.parse(req, (err, fields, files) => {
-      if (err) return reject(err);
-      resolve({ fields, files });
+  let parsed;
+  try {
+    parsed = await new Promise((resolve, reject) => {
+      form.parse(req, (err, fields, files) => {
+        if (err) return reject(err);
+        resolve({ fields, files });
+      });
     });
-  });
+  } catch (err) {
+    const msg = err.message?.includes('maxFileSize') ? 'File exceeds 50 MB limit' : 'Failed to parse upload';
+    return res.status(400).json({ error: msg });
+  }
 
   const file = parsed.files?.file;
   if (!file) return res.status(400).json({ error: 'No file uploaded' });
 
-  // Rate limit
+  // Validate file type
+  const filename = (file.originalFilename || file.name || '').toLowerCase();
+  const mimetype = file.mimetype || file.type || '';
+  if (!filename.endsWith('.pdf') && !mimetype.includes('pdf')) {
+    return res.status(400).json({ error: 'Only PDF files are accepted' });
+  }
+
   const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim();
-  const rl = checkRateLimit(ip, 5, 60); // 5 uploads per minute per IP
+  const rl = await checkRateLimit(ip, 5, 60);
   res.setHeader('X-RateLimit-Remaining', String(rl.remaining));
   res.setHeader('X-RateLimit-Reset', String(rl.resetSeconds));
   if (!rl.ok) return res.status(429).json({ error: 'Too many requests' });
 
-  // Turnstile verification
   const turnstileToken = parsed.fields?.turnstileToken || parsed.fields?.turnstiletoken;
-  if (!turnstileToken) return res.status(403).json({ error: 'Missing turnstile token' });
-  const secret = process.env.TURNSTILE_SECRET;
-  if (!secret) return res.status(500).json({ error: 'Turnstile not configured' });
-  const verifyResp = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `secret=${encodeURIComponent(secret)}&response=${encodeURIComponent(turnstileToken)}`
-  });
-  const verifyJson = await verifyResp.json();
-  if (!verifyJson.success) return res.status(403).json({ error: 'Turnstile verification failed' });
-  // Read file buffer
+  const okRes = await verifyTurnstile(turnstileToken);
+  if (!okRes.ok) return res.status(403).json({ error: 'Turnstile verification failed' });
+
   const buffer = await fs.readFile(file.filepath || file.path);
 
-  // Extract text using pdf-parse
   let data;
   try {
     data = await pdf(buffer);
   } catch (err) {
     console.error('PDF parse error', err);
-    return res.status(500).json({ error: 'Failed to parse PDF' });
+    return res.status(400).json({ error: 'Failed to parse PDF' });
   }
 
-  // pdf-parse often separates pages with form-feed \f
   const pages = (data.text || '').split(/\f/).map(p => p.trim()).filter(Boolean);
 
-  // Create chunks per page (or smaller chunks if page is large)
   const items = [];
   for (let i = 0; i < pages.length; i++) {
-    const pageText = pages[i];
-    const pageChunks = chunkText(pageText, 1000);
+    const pageChunks = chunkText(pages[i], 1000);
     for (let j = 0; j < pageChunks.length; j++) {
       items.push({ id: `${Date.now()}-${i}-${j}`, text: pageChunks[j], meta: { page: i + 1, pageChunk: j } });
     }
   }
 
-  // Generate embeddings for each chunk
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const client = new OpenAI({ apiKey: process.env.CUSTOM_OPENAI_API_KEY || process.env.OPENAI_API_KEY });
   const outItems = [];
-  for (let idx = 0; idx < items.length; idx++) {
-    const it = items[idx];
+  for (const it of items) {
     try {
       const emb = await client.embeddings.create({ model: 'text-embedding-3-small', input: it.text });
-      const vector = emb.data[0].embedding;
-      outItems.push({ ...it, embedding: vector });
+      outItems.push({ ...it, embedding: emb.data[0].embedding });
     } catch (err) {
-      console.error('Embedding error', err);
+      console.error('Embedding error for chunk', it.id, err?.message || err);
+      outItems.push(it);
     }
   }
 
