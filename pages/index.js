@@ -26,10 +26,10 @@ export default function Entry() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      <div style={s.page}>
+      <div className="split-page" style={s.page}>
 
         {/* Left panel — brand identity */}
-        <div style={s.left}>
+        <div className="split-left" style={s.left}>
           <div style={s.leftInner}>
             <div style={s.brandText}>
               <span style={s.brandSmall}>o</span>
@@ -54,9 +54,8 @@ export default function Entry() {
         </div>
 
         {/* Right panel — verification */}
-        <div style={s.right}>
+        <div className="split-right" style={s.right}>
           <div style={s.card}>
-            <div style={s.cardEyebrow}>Acesso ao sistema</div>
             <h2 style={s.cardTitle}>Verificação<br />necessária</h2>
             <p style={s.cardDesc}>
               Confirme que você é humano para explorar as propostas do Livro Amarelo.
@@ -87,20 +86,12 @@ export default function Entry() {
 
 const s = {
   page: {
-    minHeight: '100vh',
-    display: 'flex',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
 
   /* ── Left yellow panel ── */
   left: {
-    flex: '1 1 55%',
     background: '#FCBF22',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '48px 40px',
-    minHeight: '100vh',
   },
   leftInner: {
     maxWidth: '480px',
@@ -147,12 +138,7 @@ const s = {
 
   /* ── Right white panel ── */
   right: {
-    flex: '1 1 45%',
     background: '#FFFFFF',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '48px 40px',
   },
   card: {
     width: '100%',

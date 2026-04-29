@@ -113,7 +113,7 @@ export default function QA() {
           {/* Input card */}
           <div style={s.inputCard}>
             <label style={s.inputLabel}>Faça uma pergunta sobre os temas tratados no Livro Amarelo</label>
-            <div style={s.inputRow}>
+            <div className="input-row" style={s.inputRow}>
               <input
                 ref={inputRef}
                 value={q}
@@ -178,19 +178,6 @@ export default function QA() {
               </div>
               <div style={s.answerText}>{answer.text}</div>
 
-              {/* Sources */}
-              {sources.length > 0 && (
-                <div style={s.sourcesWrap}>
-                  <p style={s.sourcesLabel}>Fontes citadas</p>
-                  <div style={s.sourcesList}>
-                    {sources.map((src, i) => (
-                      <span key={i} style={s.sourceBadge}>
-                        {src.file?.replace('.pdf', '') || 'documento'} · pág. {src.page}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* New question */}
               <div style={s.newQRow}>
@@ -204,7 +191,6 @@ export default function QA() {
           {/* Welcome */}
           {!answer && !loading && (
             <div style={s.welcome}>
-              <img src="/cover.png" alt="" style={s.welcomeImg} />
               <p style={s.welcomeText}>
                 Explore o Livro Amarelo e suas propostas para o Brasil.
               </p>
@@ -307,10 +293,7 @@ const s = {
     letterSpacing: '0.06em',
     marginBottom: '12px',
   },
-  inputRow: {
-    display: 'flex',
-    gap: '10px',
-  },
+  inputRow: {},
   input: {
     flex: 1,
     padding: '12px 16px',

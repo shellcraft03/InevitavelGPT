@@ -51,3 +51,22 @@ input, textarea {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.4; }
 }
+
+/* ── Index: split layout ── */
+.split-page   { display: flex; min-height: 100vh; }
+.split-left   { flex: 1 1 55%; display: flex; align-items: center; justify-content: center; padding: 48px 40px; }
+.split-right  { flex: 1 1 45%; display: flex; align-items: center; justify-content: center; padding: 48px 40px; background: #fff; }
+
+@media (max-width: 720px) {
+  .split-page  { flex-direction: column; }
+  .split-left  { min-height: auto; padding: 40px 24px 32px; }
+  .split-right { padding: 32px 24px 48px; width: 100%; }
+}
+
+/* ── QA: input row ── */
+.input-row { display: flex; gap: 10px; }
+
+@media (max-width: 480px) {
+  .input-row         { flex-direction: column; }
+  .input-row button  { width: 100%; }
+}

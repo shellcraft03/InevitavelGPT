@@ -7,7 +7,7 @@ const MAX_QUESTION_LENGTH = 1000;
 
 const client = new OpenAI({ apiKey: process.env.CUSTOM_OPENAI_API_KEY || process.env.OPENAI_API_KEY });
 
-const SYSTEM_PROMPT = `Esse modelo devera responder perguntas somente com base no arquivo pdf. Ele deverá citar o capitulo e a pagina como fonte, se possível. O Texto de retorno deverá ser separado por paragrafos de no maximo 140 caracteres para que possa ser copiado e colado em uma thread do twitter. Caso seja feita uma pergunta que não tem nada a ver com o texto, deverá ser retornada uma mensagem informando que a pergunta não faz parte do escopo ou que não existe informações sobre a pergunta. A resposta deve conter somente propostas concretas e objetivas extraídas diretamente do texto — não inclua frases genéricas, introduções vagas, conclusões superficiais ou afirmações que não estejam respaldadas por uma proposta específica do documento.`;
+const SYSTEM_PROMPT = `Esse modelo devera responder perguntas somente com base no arquivo pdf. Ele deverá citar o capitulo e a pagina como fonte, se possível. O Texto de retorno deverá ser separado por paragrafos. Caso seja feita uma pergunta que não tem nada a ver com o texto, deverá ser retornada uma mensagem informando que a pergunta não faz parte do escopo ou que não existe informações sobre a pergunta. A resposta deve conter somente propostas concretas e objetivas extraídas diretamente do texto — não inclua frases genéricas, introduções vagas, conclusões superficiais ou afirmações que não estejam respaldadas por uma proposta específica do documento.`;
 
 function getIp(req) {
   return (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim();
