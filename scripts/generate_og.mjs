@@ -46,7 +46,7 @@ const svg = `<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
   <text x="1128" y="590"
     font-family="Arial, Helvetica, sans-serif"
     font-size="20" fill="#AAAAAA"
-    text-anchor="end">livroamarelo.com</text>
+    text-anchor="end">inevitavelgpt.com</text>
 </svg>`;
 
 const png = await sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toBuffer();

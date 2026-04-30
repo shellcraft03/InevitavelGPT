@@ -3,4 +3,4 @@ Allow: /
 Disallow: /inicio
 Disallow: /api/
 
-Sitemap: https://livroamarelo.com/sitemap.xml
+Sitemap: https://www.inevitavelgpt.com/sitemap.xml
