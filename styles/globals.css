@@ -63,6 +63,10 @@ input, textarea {
   .split-right { padding: 32px 24px 48px; width: 100%; }
 }
 
+/* ── Nav links ── */
+.nav-link { transition: color 0.15s; }
+.nav-link:hover { color: #FFFFFF !important; }
+
 /* ── QA: input row ── */
 .input-row { display: flex; gap: 10px; }
 

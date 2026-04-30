@@ -59,7 +59,8 @@ This web application allows users to explore the content of O Livro Amarelo thro
 livro-amarelo/
 ├── pages/
 │   ├── index.js              # Verification page (Turnstile)
-│   ├── qa.js                 # Q&A interface
+│   ├── inicio.js             # Q&A interface
+│   ├── sobre.js              # About page
 │   ├── _app.js               # App wrapper — global CSS + Google Analytics
 │   └── api/
 │       ├── chat.js           # Main RAG + LLM endpoint
@@ -174,26 +175,26 @@ npm run build && npm start     # production
 User
   │
   ▼
-┌────────────────────────────────┐
-│  /  — Turnstile Verification   │  Solve CAPTCHA → click "Enter"
-└─────────────┬──────────────────┘
+┌──────────────────────────────────────┐
+│  /  — Turnstile Verification         │  Solve CAPTCHA → click "Enter"
+└─────────────┬────────────────────────┘
               │ token saved in sessionStorage
               ▼
-┌────────────────────────────────┐
-│  /qa — Q&A Interface           │  Type question → Enter or button
-└─────────────┬──────────────────┘
+┌──────────────────────────────────────┐
+│  /inicio — Q&A Interface             │  Type question → Enter or button
+└─────────────┬────────────────────────┘
               │ fresh token generated per request
               ▼
-┌────────────────────────────────┐
-│  /api/chat                     │
-│  1. Verify POST method         │
-│  2. Rate limit (min + day)     │
-│  3. Verify Turnstile           │
-│  4. Embed the question         │
+┌──────────────────────────────────────┐
+│  /api/chat                           │
+│  1. Verify POST method               │
+│  2. Rate limit (min + day)           │
+│  3. Verify Turnstile                 │
+│  4. Embed the question               │
 │  5. Retrieve top-6 chunks (Pinecone) │
-│  6. Build prompt with context  │
-│  7. GPT-4.1-mini responds      │
-└─────────────┬──────────────────┘
+│  6. Build prompt with context        │
+│  7. GPT-4.1-mini responds            │
+└─────────────┬────────────────────────┘
               │
               ▼
         Answer with page citation

@@ -16,7 +16,7 @@ export default function Entry() {
   function execute() {
     if (!pendingToken) return;
     sessionStorage.setItem('turnstileToken', pendingToken);
-    router.push('/qa');
+    router.push('/inicio');
   }
 
   return (
