@@ -29,6 +29,14 @@ export default function QA() {
     if (!token) router.replace('/');
   }, [router]);
 
+  function handleReset() {
+    setQ('');
+    setAnswer(null);
+    setAskedQuestion('');
+    setLoading(false);
+    setCopied(false);
+  }
+
   async function ask(question) {
     const text = (question ?? q).trim().slice(0, MAX_QUESTION_LENGTH);
     if (!text || loading) return;
@@ -240,6 +248,19 @@ export default function QA() {
                 <div style={s.headerSub}>O Futuro é Glorioso</div>
               </div>
             </a>
+            <nav style={s.nav}>
+              <a
+                href="/inicio"
+                className="nav-link"
+                style={s.navLinkActive}
+                onClick={e => { e.preventDefault(); handleReset(); }}
+              >
+                Início
+              </a>
+              <a href="/sobre" className="nav-link" style={s.navLink}>
+                Sobre
+              </a>
+            </nav>
           </div>
         </header>
 
@@ -351,6 +372,24 @@ const s = {
     display: 'flex',
     flexDirection: 'column',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  },
+
+  nav: {
+    display: 'flex',
+    gap: '24px',
+    alignItems: 'center',
+  },
+  navLink: {
+    color: '#999999',
+    textDecoration: 'none',
+    fontSize: '0.9rem',
+    fontWeight: 500,
+  },
+  navLinkActive: {
+    color: '#FCBF22',
+    textDecoration: 'none',
+    fontSize: '0.9rem',
+    fontWeight: 700,
   },
 
   /* ── Header ── */

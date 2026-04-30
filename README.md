@@ -59,7 +59,8 @@ Esta aplicação web permite explorar o conteúdo do Livro Amarelo por meio de p
 livro-amarelo/
 ├── pages/
 │   ├── index.js              # Página de verificação (Turnstile)
-│   ├── qa.js                 # Interface de perguntas e respostas
+│   ├── inicio.js             # Interface de perguntas e respostas
+│   ├── sobre.js              # Página sobre o projeto
 │   ├── _app.js               # App wrapper — CSS global + Google Analytics
 │   └── api/
 │       ├── chat.js           # Endpoint principal RAG + LLM
@@ -174,26 +175,26 @@ npm run build && npm start     # produção
 Usuário
   │
   ▼
-┌────────────────────────────────┐
-│  /  — Verificação Turnstile    │  Resolve o CAPTCHA → clica "Entrar"
-└─────────────┬──────────────────┘
+┌───────────────────────────────────┐
+│  /  — Verificação Turnstile       │  Resolve o CAPTCHA → clica "Entrar"
+└─────────────┬─────────────────────┘
               │ token salvo em sessionStorage
               ▼
-┌────────────────────────────────┐
-│  /qa — Interface Q&A           │  Digita pergunta → Enter ou botão
-└─────────────┬──────────────────┘
+┌───────────────────────────────────┐
+│  /inicio — Interface Q&A          │  Digita pergunta → Enter ou botão
+└─────────────┬─────────────────────┘
               │ token fresco gerado por requisição
               ▼
-┌────────────────────────────────┐
-│  /api/chat                     │
-│  1. Verifica método POST       │
-│  2. Rate limit (min + dia)     │
-│  3. Verifica Turnstile         │
-│  4. Embed a pergunta           │
+┌───────────────────────────────────┐
+│  /api/chat                        │
+│  1. Verifica método POST          │
+│  2. Rate limit (min + dia)        │
+│  3. Verifica Turnstile            │
+│  4. Embed a pergunta              │
 │  5. Busca top-6 chunks (Pinecone) │
-│  6. Monta prompt com contexto  │
-│  7. GPT-4.1-mini responde      │
-└─────────────┬──────────────────┘
+│  6. Monta prompt com contexto     │
+│  7. GPT-4.1-mini responde         │
+└─────────────┬─────────────────────┘
               │
               ▼
         Resposta com citação de página
