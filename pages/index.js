@@ -30,13 +30,13 @@ export default function Entry() {
         <meta property="og:url" content="https://livroamarelo.com" />
         <meta property="og:title" content="o Livro Amarelo — O Futuro é Glorioso" />
         <meta property="og:description" content="Explore as propostas do Livro Amarelo — um projeto de país para transformar o Brasil na quinta maior economia do mundo." />
-        <meta property="og:image" content="https://livroamarelo.com/api/og" />
+        <meta property="og:image" content="https://livroamarelo.com/og.png" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="o Livro Amarelo — O Futuro é Glorioso" />
         <meta name="twitter:description" content="Explore as propostas do Livro Amarelo — um projeto de país para transformar o Brasil na quinta maior economia do mundo." />
-        <meta name="twitter:image" content="https://livroamarelo.com/api/og" />
+        <meta name="twitter:image" content="https://livroamarelo.com/og.png" />
       </Head>
 
       <div className="split-page" style={s.page}>
