@@ -3,4 +3,5 @@
 .env.local
 /.env
 data/books/*.pdf
+data/store.json
 .claude/
