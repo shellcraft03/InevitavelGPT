@@ -24,10 +24,12 @@ function getIp(req) {
 function sanitizeQuestion(raw) {
   return raw
     .toString()
+    .normalize('NFKC')                                        // normalize unicode (fullwidth, lookalikes, etc.)
     .trim()
     .slice(0, MAX_QUESTION_LENGTH)
-    .replace(/\n{3,}/g, '\n\n') // collapse excessive newlines
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ''); // strip control characters
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')      // strip control characters
+    .replace(/\n{3,}/g, '\n\n')                               // collapse excessive newlines
+    .replace(/[^a-zA-ZÀ-ú0-9\s.,!?;:()\-'"/%\n]/g, '');    // allowlist: strip chars outside Portuguese set
 }
 
 export default async function handler(req, res) {
