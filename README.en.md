@@ -12,6 +12,7 @@ Retrieval-Augmented Generation with OpenAI · Protected by Cloudflare Turnstile
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs)
 ![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4.1--mini-412991?style=flat-square&logo=openai)
+![Pinecone](https://img.shields.io/badge/Pinecone-Vector%20DB-00B07D?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-white?style=flat-square)
 
 </div>
@@ -44,7 +45,7 @@ This web application allows users to explore the content of O Livro Amarelo thro
 | Frontend | Next.js 16 · React 18 |
 | LLM | OpenAI GPT-4.1-mini |
 | Embeddings | OpenAI text-embedding-3-small |
-| Vector store | JSON file-based (local) |
+| Vector store | Pinecone (cloud vector database) |
 | CAPTCHA | Cloudflare Turnstile |
 | Rate limit | In-memory · Redis (optional) |
 | Analytics | Google Analytics 4 |
@@ -72,14 +73,14 @@ livro-amarelo/
 │   └── rateLimiter.js        # IP-based rate limiting
 ├── scripts/
 │   ├── index_pdf.mjs             # Index PDFs from data/books/
-│   └── generate_embeddings.mjs   # Generate embeddings for items without vectors
+│   ├── generate_embeddings.mjs   # Generate embeddings for items without vectors
+│   └── migrate_to_pinecone.mjs   # Upload vectors from store.json to Pinecone
 ├── styles/
 │   └── globals.css           # Color palette, reset and responsive classes
 ├── public/
 │   └── cover.png             # Cover illustration
 └── data/
-    ├── books/                # Source PDFs (not versioned)
-    └── store.json            # Vector store with pre-generated embeddings
+    └── books/                # Source PDFs (not versioned)
 ```
 
 ---
@@ -104,6 +105,10 @@ OPENAI_API_KEY=sk-...
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x...
 TURNSTILE_SECRET=0x...
 
+# Pinecone
+PINECONE_API_KEY=pcsk-...
+PINECONE_INDEX=your-index-name
+
 # Enable RAG pipeline
 USE_RAG=true
 
@@ -114,23 +119,35 @@ USE_RAG=true
 # REDIS_URL=redis://...
 ```
 
+> **Pinecone:** create an index in the [Pinecone console](https://app.pinecone.io) with dimension **1536** (compatible with `text-embedding-3-small`) and a region of your choice. After indexing PDFs locally, run the migration script (step 3b) to upload the vectors to Pinecone.
+
 > **Note:** Your OpenAI project must have access to two models:
 > - `text-embedding-3-small` — for embedding generation during indexing and queries
 > - `gpt-4.1-mini` — for natural language response generation
 >
 > Check at *platform.openai.com → Projects → Model access*. These are the default models, but developers can swap them for any models they prefer by editing the `EMBEDDING_MODEL` variable and the `model` field in `pages/api/chat.js`.
 
-### 3. Index the document
+### 3. Index the document and upload to Pinecone
 
 Place the PDF in `data/books/` and run:
 
 ```bash
-# First-time indexing
+# First-time indexing (extracts text, generates chunks and embeddings locally)
 npm run index:pdf
 
 # Re-index from scratch (clears the store first)
 npm run index:pdf -- --reindex
 ```
+
+#### 3b. Migrate vectors to Pinecone
+
+After local indexing, upload the vectors to Pinecone:
+
+```bash
+node scripts/migrate_to_pinecone.mjs
+```
+
+The script reads the local `store.json` and uploads all vectors in batches of 100. After migration, `store.json` is no longer needed in production — vectors are stored in Pinecone.
 
 ### 4. Generate missing embeddings
 
@@ -173,7 +190,7 @@ User
 │  2. Rate limit (min + day)     │
 │  3. Verify Turnstile           │
 │  4. Embed the question         │
-│  5. Retrieve top-6 chunks      │
+│  5. Retrieve top-6 chunks (Pinecone) │
 │  6. Build prompt with context  │
 │  7. GPT-4.1-mini responds      │
 └─────────────┬──────────────────┘
@@ -193,8 +210,9 @@ User
 | `npm run build` | Production build |
 | `npm start` | Production server |
 | `npm run index:pdf` | Index PDFs in `data/books/` |
-| `npm run index:pdf -- --reindex` | Clear store and re-index |
+| `npm run index:pdf -- --reindex` | Clear local store and re-index |
 | `npm run generate:embeddings` | Fill in missing embeddings |
+| `node scripts/migrate_to_pinecone.mjs` | Upload vectors from store.json to Pinecone |
 
 ---
 

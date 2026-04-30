@@ -12,6 +12,7 @@ RAG (Retrieval-Augmented Generation) com OpenAI · Protegido por Cloudflare Turn
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs)
 ![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4.1--mini-412991?style=flat-square&logo=openai)
+![Pinecone](https://img.shields.io/badge/Pinecone-Vector%20DB-00B07D?style=flat-square)
 ![License](https://img.shields.io/badge/licença-MIT-white?style=flat-square)
 
 </div>
@@ -44,7 +45,7 @@ Esta aplicação web permite explorar o conteúdo do Livro Amarelo por meio de p
 | Frontend | Next.js 16 · React 18 |
 | LLM | OpenAI GPT-4.1-mini |
 | Embeddings | OpenAI text-embedding-3-small |
-| Vector store | JSON file-based (local) |
+| Vector store | Pinecone (banco de vetores em nuvem) |
 | CAPTCHA | Cloudflare Turnstile |
 | Rate limit | In-memory · Redis (opcional) |
 | Analytics | Google Analytics 4 |
@@ -72,14 +73,14 @@ livro-amarelo/
 │   └── rateLimiter.js        # Rate limiting por IP
 ├── scripts/
 │   ├── index_pdf.mjs             # Indexar PDFs da pasta data/books/
-│   └── generate_embeddings.mjs   # Gerar embeddings para itens sem vetor
+│   ├── generate_embeddings.mjs   # Gerar embeddings para itens sem vetor
+│   └── migrate_to_pinecone.mjs   # Migrar vetores do store.json para o Pinecone
 ├── styles/
 │   └── globals.css           # Paleta de cores, reset e classes responsivas
 ├── public/
 │   └── cover.png             # Ilustração da capa
 └── data/
-    ├── books/                # PDFs fonte (não versionados)
-    └── store.json            # Vector store com embeddings pré-gerados
+    └── books/                # PDFs fonte (não versionados)
 ```
 
 ---
@@ -104,6 +105,10 @@ OPENAI_API_KEY=sk-...
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x...
 TURNSTILE_SECRET=0x...
 
+# Pinecone
+PINECONE_API_KEY=pcsk-...
+PINECONE_INDEX=nome-do-index
+
 # Habilitar pipeline RAG
 USE_RAG=true
 
@@ -114,23 +119,35 @@ USE_RAG=true
 # REDIS_URL=redis://...
 ```
 
+> **Pinecone:** crie um index no [console do Pinecone](https://app.pinecone.io) com dimensão **1536** (compatível com `text-embedding-3-small`) e região de sua preferência. Após indexar os PDFs localmente, execute o script de migração (seção 3b) para enviar os vetores ao Pinecone.
+
 > **Atenção:** o projeto OpenAI precisa ter acesso a dois modelos:
 > - `text-embedding-3-small` — para geração de embeddings na indexação e nas consultas
 > - `gpt-4.1-mini` — para geração de respostas em linguagem natural
 >
 > Verifique em *platform.openai.com → Projects → Model access*. Os modelos acima são os padrões utilizados, mas o desenvolvedor pode substituí-los pelos modelos de sua preferência editando as variáveis `EMBEDDING_MODEL` e o campo `model` em `pages/api/chat.js`.
 
-### 3. Indexar o documento
+### 3. Indexar o documento e enviar ao Pinecone
 
 Coloque o PDF em `data/books/` e execute:
 
 ```bash
-# Primeira indexação
+# Primeira indexação (extrai texto, gera chunks e embeddings localmente)
 npm run index:pdf
 
 # Re-indexar do zero (limpa o store antes)
 npm run index:pdf -- --reindex
 ```
+
+#### 3b. Migrar vetores para o Pinecone
+
+Após a indexação local, envie os vetores para o Pinecone:
+
+```bash
+node scripts/migrate_to_pinecone.mjs
+```
+
+O script lê o `store.json` local e faz upload de todos os vetores em lotes de 100. Após a migração, o `store.json` não é mais necessário em produção — os vetores ficam armazenados no Pinecone.
 
 ### 4. Gerar embeddings ausentes
 
@@ -173,7 +190,7 @@ Usuário
 │  2. Rate limit (min + dia)     │
 │  3. Verifica Turnstile         │
 │  4. Embed a pergunta           │
-│  5. Busca top-6 chunks         │
+│  5. Busca top-6 chunks (Pinecone) │
 │  6. Monta prompt com contexto  │
 │  7. GPT-4.1-mini responde      │
 └─────────────┬──────────────────┘
@@ -193,8 +210,9 @@ Usuário
 | `npm run build` | Build de produção |
 | `npm start` | Servidor de produção |
 | `npm run index:pdf` | Indexar PDFs em `data/books/` |
-| `npm run index:pdf -- --reindex` | Limpar store e re-indexar |
+| `npm run index:pdf -- --reindex` | Limpar store local e re-indexar |
 | `npm run generate:embeddings` | Preencher embeddings ausentes |
+| `node scripts/migrate_to_pinecone.mjs` | Enviar vetores do store.json para o Pinecone |
 
 ---
 
