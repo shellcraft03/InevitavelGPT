@@ -4,7 +4,7 @@
 
 **Explore o Livro Amarelo por meio de perguntas em linguagem natural.**
 
-Powered by RAG (Retrieval-Augmented Generation) com OpenAI · Protegido por Cloudflare Turnstile
+RAG (Retrieval-Augmented Generation) com OpenAI · Protegido por Cloudflare Turnstile
 
 ---
 
