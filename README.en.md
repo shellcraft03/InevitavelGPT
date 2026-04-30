@@ -1,6 +1,6 @@
 <div align="center">
 
-**🌐 Language / Idioma:** [Português](README.md) · [English](README.en.md)
+**🌐 Language / Idioma:** [English](README.en.md) . [Português](README.md)
 
 # o Livro Amarelo — Q&A
 
