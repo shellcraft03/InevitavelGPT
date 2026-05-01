@@ -8,7 +8,7 @@ const PAGES = [
 
 function SunIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="4"/>
       <line x1="12" y1="2"    x2="12"    y2="6"/>
       <line x1="12" y1="18"   x2="12"    y2="22"/>
@@ -24,7 +24,7 @@ function SunIcon() {
 
 function MoonIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
     </svg>
   );
@@ -32,7 +32,7 @@ function MoonIcon() {
 
 function ChevronIcon({ open }) {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
       style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
       <polyline points="6 9 12 15 18 9"/>
     </svg>
@@ -160,24 +160,24 @@ function getStyles(dark) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      width: '32px',
-      height: '32px',
-      borderRadius: '8px',
+      width: '44px',
+      height: '44px',
+      borderRadius: '10px',
       padding: 0,
       flexShrink: 0,
     },
     navDropdownBtn: {
       background: 'none',
       border: `1px solid ${dark ? '#444444' : '#DDDDDD'}`,
-      borderRadius: '8px',
-      padding: '6px 10px 6px 12px',
+      borderRadius: '10px',
+      padding: '10px 14px 10px 16px',
       cursor: 'pointer',
       color: text1,
-      fontSize: '0.9rem',
+      fontSize: '1rem',
       fontWeight: 600,
       display: 'flex',
       alignItems: 'center',
-      gap: '6px',
+      gap: '8px',
     },
     navDropdown: {
       position: 'absolute',
@@ -185,26 +185,26 @@ function getStyles(dark) {
       right: 0,
       background: headerBg,
       border: `1px solid ${dark ? '#444444' : '#DDDDDD'}`,
-      borderRadius: '8px',
+      borderRadius: '10px',
       overflow: 'hidden',
       boxShadow: dark ? '0 4px 16px rgba(0,0,0,0.5)' : '0 4px 16px rgba(0,0,0,0.08)',
-      minWidth: '130px',
+      minWidth: '150px',
       zIndex: 200,
     },
     navDropdownItem: {
       display: 'block',
-      padding: '10px 16px',
+      padding: '13px 20px',
       color: textMuted,
       textDecoration: 'none',
-      fontSize: '0.9rem',
+      fontSize: '1rem',
       fontWeight: 500,
     },
     navDropdownItemActive: {
       display: 'block',
-      padding: '10px 16px 10px 13px',
+      padding: '13px 20px 13px 17px',
       color: text1,
       textDecoration: 'none',
-      fontSize: '0.9rem',
+      fontSize: '1rem',
       fontWeight: 700,
       background: dark ? '#252525' : '#F8F8F8',
       borderLeft: '3px solid #FCBF22',
