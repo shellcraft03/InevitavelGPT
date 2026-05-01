@@ -30,9 +30,16 @@ export function useTurnstile(containerId, { onToken } = {}) {
       setReady(true);
     }
 
+    function cleanup() {
+      if (window.turnstile && widgetIdRef.current != null) {
+        window.turnstile.remove(widgetIdRef.current);
+        widgetIdRef.current = null;
+      }
+    }
+
     if (window.turnstile) {
       renderWidget();
-      return;
+      return cleanup;
     }
 
     // Avoid loading the script twice if another page already added it
@@ -43,7 +50,7 @@ export function useTurnstile(containerId, { onToken } = {}) {
           renderWidget();
         }
       }, 100);
-      return () => clearInterval(interval);
+      return () => { clearInterval(interval); cleanup(); };
     }
 
     const s = document.createElement('script');
@@ -52,6 +59,7 @@ export function useTurnstile(containerId, { onToken } = {}) {
     s.defer = true;
     s.onload = () => { if (window.turnstile) renderWidget(); };
     document.body.appendChild(s);
+    return cleanup;
   }, [containerId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function getFreshToken() {
