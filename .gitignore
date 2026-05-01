@@ -5,3 +5,5 @@
 data/books/*.pdf
 data/store.json
 .claude/
+AGENTS.md
+CLAUDE.md
