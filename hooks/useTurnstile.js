@@ -69,7 +69,6 @@ export function useTurnstile(containerId, { onToken } = {}) {
     return new Promise((resolve) => {
       tokenResolveRef.current = resolve;
       window.turnstile.reset(widgetIdRef.current);
-      window.turnstile.execute(widgetIdRef.current);
     });
   }
 
