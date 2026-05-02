@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { checkRateLimit } from '../../lib/rateLimiter.js';
+import { checkMinuteLimit, checkDailyLimit } from '../../lib/rateLimiter.js';
 import { queryEmbedding } from '../../lib/vectorStore.js';
 import { verifyTurnstile } from '../../lib/turnstile.js';
 
@@ -45,14 +45,20 @@ export default async function handler(req, res) {
     const ip = getIp(req);
 
     // Per-minute limit: 10 requests / 60s
-    const rl = await checkRateLimit(ip, 10, 60);
+    const rl = await checkMinuteLimit(ip);
     res.setHeader('X-RateLimit-Remaining', String(rl.remaining));
     res.setHeader('X-RateLimit-Reset', String(rl.resetSeconds));
-    if (!rl.ok) return res.status(429).json({ error: 'Too many requests' });
+    if (!rl.ok) {
+      console.warn(`[rate-limit] per-minute ip=${ip} remaining=${rl.remaining} reset=${rl.resetSeconds}s`);
+      return res.status(429).json({ error: 'Too many requests' });
+    }
 
     // Daily limit: 50 requests / 24h
-    const daily = await checkRateLimit(`${ip}:day`, 50, 86400);
-    if (!daily.ok) return res.status(429).json({ error: 'Daily limit reached' });
+    const daily = await checkDailyLimit(ip);
+    if (!daily.ok) {
+      console.warn(`[rate-limit] daily ip=${ip} remaining=${daily.remaining} reset=${daily.resetSeconds}s`);
+      return res.status(429).json({ error: 'Daily limit reached' });
+    }
 
     const okRes = await verifyTurnstile(turnstileToken);
     if (!okRes.ok) {
