@@ -99,7 +99,8 @@ export default function Entry() {
             </button>
 
             <p style={s.cardNote}>
-              Apenas dados básicos e anônimos são coletados para manter a segurança e o funcionamento do site.
+              Apenas dados básicos e anônimos são coletados para manter a segurança e o funcionamento do site.{' '}
+              <a href="/privacidade" style={s.cardNoteLink}>Política de privacidade</a>
             </p>
 
             <div style={s.shareDivider} />
@@ -211,6 +212,11 @@ function getStyles(dark) {
       fontSize: '0.75rem',
       textAlign: 'center',
       marginTop: '14px',
+    },
+    cardNoteLink: {
+      color: dark ? '#FCBF22' : '#000000',
+      fontWeight: 600,
+      textDecoration: 'underline',
     },
     shareDivider: {
       height: '1px',
