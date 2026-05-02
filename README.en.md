@@ -13,6 +13,7 @@ Retrieval-Augmented Generation with OpenAI · Protected by Cloudflare Turnstile
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs)
 ![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4.1--mini-412991?style=flat-square&logo=openai)
 ![Pinecone](https://img.shields.io/badge/Pinecone-Vector%20DB-00B07D?style=flat-square)
+![Upstash](https://img.shields.io/badge/Upstash-Rate%20Limit-00E9A3?style=flat-square&logo=upstash)
 ![License](https://img.shields.io/badge/license-MIT-white?style=flat-square)
 
 </div>
@@ -31,7 +32,7 @@ This web application allows users to explore the content of O Livro Amarelo thro
 
 - **Full RAG pipeline** — semantic search via embeddings + contextualized response generation
 - **CAPTCHA protection** — Cloudflare Turnstile with a fresh token per request
-- **Rate limiting** — 10 req/min and 50 req/day per IP, with Redis or in-memory fallback
+- **Rate limiting** — 10 req/min and 50 req/day per IP via Sliding Window (`@upstash/ratelimit`) · block analytics visible in the Upstash dashboard · in-memory fallback (local dev)
 - **Concrete answers** — the model is instructed to cite only proposals explicitly found in the document
 - **Sharing** — buttons to copy text or download the answer as a JPEG image
 - **Responsive** — layout adapted for desktop and mobile devices
@@ -47,7 +48,7 @@ This web application allows users to explore the content of O Livro Amarelo thro
 | Embeddings | OpenAI text-embedding-3-small |
 | Vector store | Pinecone (cloud vector database) |
 | CAPTCHA | Cloudflare Turnstile |
-| Rate limit | Upstash Redis (serverless) · in-memory fallback (local dev) |
+| Rate limit | @upstash/ratelimit · Sliding Window · Upstash Redis (serverless) · in-memory fallback (local dev) |
 | Analytics | Google Analytics 4 |
 | PDF parsing | pdf-parse |
 
