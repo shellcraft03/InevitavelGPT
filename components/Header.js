@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 
 // Adicionar novas páginas aqui — o dropdown atualiza automaticamente
 const PAGES = [
-  { href: '/inicio', label: 'Início' },
-  { href: '/sobre',  label: 'Sobre'  },
+  { href: '/inicio',       label: 'Início'      },
+  { href: '/sobre',        label: 'Sobre'       },
+  { href: '/privacidade',  label: 'Privacidade' },
 ];
 
 function SunIcon() {
