@@ -13,6 +13,7 @@ RAG (Retrieval-Augmented Generation) com OpenAI · Protegido por Cloudflare Turn
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs)
 ![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4.1--mini-412991?style=flat-square&logo=openai)
 ![Pinecone](https://img.shields.io/badge/Pinecone-Vector%20DB-00B07D?style=flat-square)
+![Upstash](https://img.shields.io/badge/Upstash-Rate%20Limit-00E9A3?style=flat-square&logo=upstash)
 ![License](https://img.shields.io/badge/licença-MIT-white?style=flat-square)
 
 </div>
@@ -31,7 +32,7 @@ Esta aplicação web permite explorar o conteúdo do Livro Amarelo por meio de p
 
 - **RAG completo** — busca semântica por embeddings + geração de resposta contextualizada
 - **Proteção por CAPTCHA** — Cloudflare Turnstile com token renovado por requisição
-- **Rate limiting** — 10 req/min e 50 req/dia por IP, com suporte a Redis ou fallback em memória
+- **Rate limiting** — 10 req/min e 50 req/dia por IP via Sliding Window (`@upstash/ratelimit`) · analytics de bloqueios visível no dashboard Upstash · fallback em memória (dev local)
 - **Respostas concretas** — o modelo é instruído a citar apenas propostas explícitas do documento
 - **Compartilhamento** — botões para copiar texto ou baixar a resposta como imagem JPEG
 - **Responsivo** — layout adaptado para desktop e dispositivos móveis
@@ -47,7 +48,7 @@ Esta aplicação web permite explorar o conteúdo do Livro Amarelo por meio de p
 | Embeddings | OpenAI text-embedding-3-small |
 | Vector store | Pinecone (banco de vetores em nuvem) |
 | CAPTCHA | Cloudflare Turnstile |
-| Rate limit | Upstash Redis (serverless) · fallback em memória (dev local) |
+| Rate limit | @upstash/ratelimit · Sliding Window · Upstash Redis (serverless) · fallback em memória (dev local) |
 | Analytics | Google Analytics 4 |
 | PDF parsing | pdf-parse |
 
