@@ -1,6 +1,46 @@
 import Head from 'next/head';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+
+const FASICULOS = [
+  '/fasciculo1.png',
+  '/fasciculo2.png',
+  '/fasciculo3.png',
+  '/fasciculo4.png',
+  '/fasciculo5.png',
+  '/fasciculo6.png',
+];
+
+function Slideshow() {
+  const [current, setCurrent] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => {
+        setCurrent(i => (i + 1) % FASICULOS.length);
+        setVisible(true);
+      }, 600);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <img
+      src={FASICULOS[current]}
+      alt="o Livro Amarelo"
+      style={{
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        display: 'block',
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 0.6s ease',
+      }}
+    />
+  );
+}
 import { useTurnstile } from '../hooks/useTurnstile';
 import { useDarkMode } from '../hooks/useDarkMode';
 import ShareBar from '../components/ShareBar';
@@ -71,7 +111,7 @@ export default function Entry() {
       <div className="split-page" style={s.page}>
 
         <div className="split-left" style={s.left}>
-          <img src="/cover.png" alt="o Livro Amarelo" style={s.illustration} />
+          <Slideshow />
         </div>
 
         <div className="split-right" style={s.right}>
@@ -125,13 +165,9 @@ function getStyles(dark) {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     },
     left: {
-      background: '#ECCB00',
-    },
-    illustration: {
-      width: '100%',
-      height: '100%',
-      objectFit: 'cover',
-      display: 'block',
+      background: '#EFD501',
+      padding: 0,
+      overflow: 'hidden',
     },
     right: {
       background: rightBg,
