@@ -4,8 +4,8 @@ export default function Document() {
   return (
     <Html lang="pt-BR" data-scroll-behavior="smooth">
       <Head>
-        <link rel="icon" href="/cover.png" />
-        <link rel="apple-touch-icon" href="/cover.png" />
+        <link rel="icon" href="/fasciculo3.png" />
+        <link rel="apple-touch-icon" href="/fasciculo3.png" />
       </Head>
       <body>
         <Main />
