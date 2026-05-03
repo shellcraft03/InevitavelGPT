@@ -32,7 +32,7 @@ This web application allows users to explore the content of O Livro Amarelo thro
 
 - **Full RAG pipeline** — semantic search via embeddings + contextualized response generation
 - **CAPTCHA protection** — Cloudflare Turnstile with a fresh token per request
-- **Rate limiting** — 10 req/min and 50 req/day per IP via Sliding Window (`@upstash/ratelimit`) · block analytics visible in the Upstash dashboard · in-memory fallback (local dev)
+- **Rate limiting** — 10 req/min and 50 req/day per IP via Sliding Window (`@upstash/ratelimit`) · only blocked requests are logged to the `rl:blocked` Redis key (persistent list, no TTL, timestamp in Brasília timezone) · in-memory fallback (local dev)
 - **Concrete answers** — the model is instructed to cite only proposals explicitly found in the document
 - **Sharing** — buttons to copy text or download the answer as a JPEG image
 - **Responsive** — layout adapted for desktop and mobile devices

@@ -32,7 +32,7 @@ Esta aplicação web permite explorar o conteúdo do Livro Amarelo por meio de p
 
 - **RAG completo** — busca semântica por embeddings + geração de resposta contextualizada
 - **Proteção por CAPTCHA** — Cloudflare Turnstile com token renovado por requisição
-- **Rate limiting** — 10 req/min e 50 req/dia por IP via Sliding Window (`@upstash/ratelimit`) · analytics de bloqueios visível no dashboard Upstash · fallback em memória (dev local)
+- **Rate limiting** — 10 req/min e 50 req/dia por IP via Sliding Window (`@upstash/ratelimit`) · apenas requisições bloqueadas são registradas na chave `rl:blocked` do Redis (lista persistente, sem TTL, timestamp em horário de Brasília) · fallback em memória (dev local)
 - **Respostas concretas** — o modelo é instruído a citar apenas propostas explícitas do documento
 - **Compartilhamento** — botões para copiar texto ou baixar a resposta como imagem JPEG
 - **Responsivo** — layout adaptado para desktop e dispositivos móveis
