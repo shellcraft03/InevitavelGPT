@@ -62,6 +62,7 @@ livro-amarelo/
 │   ├── index.js              # Página de verificação (Turnstile)
 │   ├── inicio.js             # Interface de perguntas e respostas
 │   ├── sobre.js              # Página sobre o projeto
+│   ├── privacidade.js        # Política de privacidade
 │   ├── _app.js               # App wrapper — CSS global + Google Analytics
 │   └── api/
 │       └── chat.js           # Endpoint principal RAG + LLM
