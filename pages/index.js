@@ -49,6 +49,7 @@ export default function Entry() {
   }, []);
 
   useTurnstile('turnstile-container', {
+    action: 'entry',
     onToken: (token) => {
       setPendingToken(token);
     }

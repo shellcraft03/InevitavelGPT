@@ -27,7 +27,7 @@ export default function QA() {
   const inputRef = useRef(null);
   const answerRef = useRef(null);
 
-  const { getFreshToken } = useTurnstile('turnstile-container-qa');
+  const { getFreshToken } = useTurnstile('turnstile-container-qa', { action: 'chat' });
 
   // Redireciona para / se não houver token de verificação
   if (typeof window !== 'undefined' && !sessionStorage.getItem('turnstileToken')) {

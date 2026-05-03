@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-export function useTurnstile(containerId, { onToken } = {}) {
+export function useTurnstile(containerId, { onToken, action } = {}) {
   const widgetIdRef = useRef(null);
   const tokenResolveRef = useRef(null);
   const [ready, setReady] = useState(false);
@@ -12,6 +12,7 @@ export function useTurnstile(containerId, { onToken } = {}) {
       if (widgetIdRef.current != null) return;
       widgetIdRef.current = window.turnstile.render(`#${containerId}`, {
         sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+        action,
         callback: (token) => {
           if (onToken) onToken(token);
           if (tokenResolveRef.current) {
@@ -60,7 +61,7 @@ export function useTurnstile(containerId, { onToken } = {}) {
     s.onload = () => { if (window.turnstile) renderWidget(); };
     document.body.appendChild(s);
     return cleanup;
-  }, [containerId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [containerId, action]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function getFreshToken() {
     if (typeof window === 'undefined' || !window.turnstile || widgetIdRef.current == null) {
