@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { checkMinuteLimit, checkDailyLimit } from '../../lib/rateLimiter.js';
+import { checkMinuteLimit, checkDailyLimit, logBlock } from '../../lib/rateLimiter.js';
 import { queryEmbedding } from '../../lib/vectorStore.js';
 import { verifyTurnstile } from '../../lib/turnstile.js';
 
@@ -72,6 +72,7 @@ export default async function handler(req, res) {
     res.setHeader('X-RateLimit-Reset', String(rl.resetSeconds));
     if (!rl.ok) {
       console.warn(`[rate-limit] per-minute ip=${ip} remaining=${rl.remaining} reset=${rl.resetSeconds}s`);
+      await logBlock(ip, 'minute');
       return res.status(429).json({ error: 'Too many requests' });
     }
 
@@ -79,6 +80,7 @@ export default async function handler(req, res) {
     const daily = await checkDailyLimit(ip);
     if (!daily.ok) {
       console.warn(`[rate-limit] daily ip=${ip} remaining=${daily.remaining} reset=${daily.resetSeconds}s`);
+      await logBlock(ip, 'daily');
       return res.status(429).json({ error: 'Daily limit reached' });
     }
 
