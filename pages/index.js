@@ -1,6 +1,9 @@
 import Head from 'next/head';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
+import { useTurnstile } from '../hooks/useTurnstile';
+import { useDarkMode } from '../hooks/useDarkMode';
+import ShareBar from '../components/ShareBar';
 
 const FASICULOS = [
   '/fasciculo1.png',
@@ -10,40 +13,6 @@ const FASICULOS = [
   '/fasciculo5.png',
   '/fasciculo6.png',
 ];
-
-function Slideshow() {
-  const [current, setCurrent] = useState(0);
-  const [visible, setVisible] = useState(true);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setVisible(false);
-      setTimeout(() => {
-        setCurrent(i => (i + 1) % FASICULOS.length);
-        setVisible(true);
-      }, 600);
-    }, 6000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <img
-      src={FASICULOS[current]}
-      alt="o Livro Amarelo"
-      style={{
-        width: '100%',
-        height: '100%',
-        objectFit: 'cover',
-        display: 'block',
-        opacity: visible ? 1 : 0,
-        transition: 'opacity 0.6s ease',
-      }}
-    />
-  );
-}
-import { useTurnstile } from '../hooks/useTurnstile';
-import { useDarkMode } from '../hooks/useDarkMode';
-import ShareBar from '../components/ShareBar';
 
 function SunIcon() {
   return (
@@ -73,6 +42,7 @@ export default function Entry() {
   const router = useRouter();
   const [pendingToken, setPendingToken] = useState(null);
   const [dark, toggleDark] = useDarkMode();
+  const [fasiculo] = useState(() => FASICULOS[Math.floor(Math.random() * FASICULOS.length)]);
 
   useTurnstile('turnstile-container', {
     onToken: (token) => {
@@ -111,7 +81,7 @@ export default function Entry() {
       <div className="split-page" style={s.page}>
 
         <div className="split-left" style={s.left}>
-          <Slideshow />
+          <img src={fasiculo} alt="o Livro Amarelo" style={s.illustration} />
         </div>
 
         <div className="split-right" style={s.right}>
@@ -168,6 +138,12 @@ function getStyles(dark) {
       background: '#EFD501',
       padding: 0,
       overflow: 'hidden',
+    },
+    illustration: {
+      width: '100%',
+      height: '100%',
+      objectFit: 'cover',
+      display: 'block',
     },
     right: {
       background: rightBg,
