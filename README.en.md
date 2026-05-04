@@ -14,6 +14,7 @@ Retrieval-Augmented Generation with OpenAI · Protected by Cloudflare Turnstile
 ![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4.1--mini-412991?style=flat-square&logo=openai)
 ![Pinecone](https://img.shields.io/badge/Pinecone-Vector%20DB-00B07D?style=flat-square)
 ![Upstash](https://img.shields.io/badge/Upstash-Rate%20Limit-00E9A3?style=flat-square&logo=upstash)
+![Turnstile](https://img.shields.io/badge/Turnstile-CAPTCHA-F38020?style=flat-square&logo=cloudflare&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-white?style=flat-square)
 
 </div>
