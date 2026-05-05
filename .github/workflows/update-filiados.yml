@@ -1,4 +1,4 @@
-name: Atualizar filiados partidários
+name: Atualizar dados partidários
 
 on:
   schedule:
@@ -36,3 +36,8 @@ jobs:
       - name: Limpar arquivos temporários
         if: always()
         run: rm -rf filiacao.zip tse_data/
+
+      - name: Atualizar deputados federais
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/aggregate_deputados.mjs

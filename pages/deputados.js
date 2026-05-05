@@ -19,7 +19,7 @@ function periodLabel(p) {
   return `${mes}/${ano}`;
 }
 
-export default function Filiados() {
+export default function Deputados() {
   const [dark, toggleDark] = useDarkMode();
   const router = useRouter();
 
@@ -35,7 +35,7 @@ export default function Filiados() {
   }, [router]);
 
   useEffect(() => {
-    fetch('/api/filiados')
+    fetch('/api/deputados')
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -62,13 +62,11 @@ export default function Filiados() {
   const periods = derivePeriods(allData);
   const ufs = deriveUFs(allData);
 
-  // Filter by selected period, then by UF if chosen
   const filtered = allData.filter(d => {
     const period = `${d.ano}-${String(d.mes).padStart(2, '0')}`;
     return period === selectedPeriod && (!selectedUF || d.uf === selectedUF);
   });
 
-  // Aggregate by partido (sum across UFs when no state filter)
   const byPartido = new Map();
   for (const row of filtered) {
     const existing = byPartido.get(row.partido);
@@ -79,29 +77,28 @@ export default function Filiados() {
     }
   }
   const rows = [...byPartido.values()].sort((a, b) => b.quantidade - a.quantidade);
-
-  const totalFiliados = rows.reduce((s, r) => s + r.quantidade, 0);
+  const totalDeputados = rows.reduce((s, r) => s + r.quantidade, 0);
 
   const s = getStyles(dark);
 
   return (
     <>
       <Head>
-        <title>Filiados Partidários — o Livro Amarelo</title>
+        <title>Deputados Federais — o Livro Amarelo</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
       </Head>
 
       <div style={s.page}>
-        <Header currentPage="filiados" dark={dark} toggleDark={toggleDark} />
+        <Header currentPage="deputados" dark={dark} toggleDark={toggleDark} />
 
         <main style={s.main}>
 
           <div style={s.card}>
-            <h1 style={s.title}>Filiados Partidários no Brasil</h1>
+            <h1 style={s.title}>Deputados Federais por Partido</h1>
             <p style={s.desc}>
-              Número de filiados a partidos políticos por estado, com base nos dados públicos do
-              Tribunal Superior Eleitoral (TSE). Atualizado automaticamente todo mês.
+              Composição da Câmara dos Deputados por partido e estado, com base nos dados
+              públicos da API da Câmara dos Deputados. Atualizado automaticamente toda segunda-feira.
             </p>
           </div>
 
@@ -136,10 +133,10 @@ export default function Filiados() {
                 </select>
               </div>
 
-              {!loading && !error && totalFiliados > 0 && (
+              {!loading && !error && totalDeputados > 0 && (
                 <div style={s.totalBadge}>
                   <span style={s.totalLabel}>Total</span>
-                  <span style={s.totalValue}>{totalFiliados.toLocaleString('pt-BR')}</span>
+                  <span style={s.totalValue}>{totalDeputados.toLocaleString('pt-BR')}</span>
                 </div>
               )}
             </div>
@@ -154,22 +151,22 @@ export default function Filiados() {
                 <table style={s.table}>
                   <thead>
                     <tr>
-                      <th style={s.thNum}>#</th>
+                      <th style={s.thRank}>#</th>
                       <th style={s.th}>Sigla</th>
-                      <th style={s.th}>Partido</th>
-                      <th style={{ ...s.th, textAlign: 'right' }}>Filiados</th>
+                      <th style={s.th}>Nome</th>
+                      <th style={s.thNum}>Deputados</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((row, i) => (
                       <tr key={row.partido} style={i % 2 === 0 ? s.trEven : s.trOdd}>
-                        <td style={s.tdNum}>{i + 1}</td>
+                        <td style={s.tdRank}>{i + 1}</td>
                         <td style={s.tdSigla}>{row.partido}</td>
                         <td style={s.td}>{row.nome_partido || '—'}</td>
                         <td style={s.tdNum}>{row.quantidade.toLocaleString('pt-BR')}</td>
                       </tr>
                     ))}
-                    {!rows.length && !loading && (
+                    {!rows.length && (
                       <tr>
                         <td colSpan={4} style={s.noData}>
                           Nenhum dado disponível para o período selecionado.
@@ -185,12 +182,12 @@ export default function Filiados() {
           <p style={s.fonte}>
             Fonte:{' '}
             <a
-              href="https://dadosabertos.tse.jus.br/dataset/delegados-partidarios"
+              href="https://dadosabertos.camara.leg.br/swagger/api.html"
               target="_blank"
               rel="noopener noreferrer"
               style={s.fonteLink}
             >
-              Tribunal Superior Eleitoral (TSE)
+              Câmara dos Deputados — Dados Abertos
             </a>
           </p>
 
@@ -201,15 +198,15 @@ export default function Filiados() {
 }
 
 function getStyles(dark) {
-  const pageBg  = dark ? '#111111' : '#F2F2F2';
-  const cardBg  = dark ? '#1A1A1A' : '#FFFFFF';
-  const cardBdr = dark ? '#333333' : '#000000';
-  const text1   = dark ? '#EEEEEE' : '#000000';
-  const textDim = dark ? '#555555' : '#999999';
-  const textSub = dark ? '#CCCCCC' : '#333333';
-  const rowEven = dark ? '#1A1A1A' : '#FFFFFF';
-  const rowOdd  = dark ? '#1F1F1F' : '#F8F8F8';
-  const inputBg = dark ? '#111111' : '#FFFFFF';
+  const pageBg   = dark ? '#111111' : '#F2F2F2';
+  const cardBg   = dark ? '#1A1A1A' : '#FFFFFF';
+  const cardBdr  = dark ? '#333333' : '#000000';
+  const text1    = dark ? '#EEEEEE' : '#000000';
+  const textDim  = dark ? '#555555' : '#999999';
+  const textSub  = dark ? '#CCCCCC' : '#333333';
+  const rowEven  = dark ? '#1A1A1A' : '#FFFFFF';
+  const rowOdd   = dark ? '#1F1F1F' : '#F8F8F8';
+  const inputBg  = dark ? '#111111' : '#FFFFFF';
   const inputBdr = dark ? '#444444' : '#CCCCCC';
 
   return {
@@ -320,6 +317,26 @@ function getStyles(dark) {
       width: '100%',
       borderCollapse: 'collapse',
       fontSize: '0.9rem',
+    },
+    thRank: {
+      padding: '12px 16px',
+      textAlign: 'left',
+      fontSize: '0.68rem',
+      fontWeight: 700,
+      color: text1,
+      textTransform: 'uppercase',
+      letterSpacing: '0.08em',
+      borderBottom: `2px solid ${cardBdr}`,
+      background: cardBg,
+      width: '48px',
+    },
+    tdRank: {
+      padding: '11px 16px',
+      color: textSub,
+      borderBottom: `1px solid ${dark ? '#2A2A2A' : '#F0F0F0'}`,
+      textAlign: 'left',
+      fontVariantNumeric: 'tabular-nums',
+      width: '48px',
     },
     th: {
       padding: '12px 16px',
