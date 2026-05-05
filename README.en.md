@@ -37,6 +37,7 @@ This web application allows users to explore the content of O Livro Amarelo thro
 - **Rate limiting** — 10 req/min and 50 req/day per IP via Sliding Window (`@upstash/ratelimit`) · only blocked requests are logged to the `rl:blocked` Redis key (persistent list, no TTL, timestamp in Brasília timezone) · in-memory fallback (local dev)
 - **Concrete answers** — the model is instructed to cite only proposals explicitly found in the document
 - **Sharing** — buttons to copy text or download the answer as a JPEG image
+- **Federal deputies** — `/deputados` page showing Chamber of Deputies composition by party and state, via the Câmara dos Deputados API; party name resolved via join with the membership database
 - **Party membership data** — `/filiados` page showing party affiliation counts by state, automatically updated every Monday via GitHub Actions from public TSE data
 - **Responsive** — layout adapted for desktop and mobile devices
 
@@ -65,16 +66,18 @@ This web application allows users to explore the content of O Livro Amarelo thro
 livro-amarelo/
 ├── .github/
 │   └── workflows/
-│       └── update-filiados.yml   # Weekly cron: downloads TSE data and updates the DB
+│       └── update-filiados.yml   # Weekly cron: updates membership (TSE) and deputies (Câmara API)
 ├── pages/
 │   ├── index.js              # Verification page (Turnstile)
 │   ├── inicio.js             # Q&A interface
+│   ├── deputados.js          # Federal deputies page by party and state
 │   ├── filiados.js           # Party membership page by state
 │   ├── sobre.js              # About page
 │   ├── privacidade.js        # Privacy policy
 │   ├── _app.js               # App wrapper — global CSS + Google Analytics
 │   └── api/
 │       ├── chat.js           # Main RAG + LLM endpoint
+│       ├── deputados.js      # Deputies endpoint (Neon + join with filiados for party name)
 │       └── filiados.js       # Party membership endpoint (reads from Neon Postgres)
 ├── hooks/
 │   └── useTurnstile.js       # React hook for the Turnstile widget
@@ -84,6 +87,7 @@ livro-amarelo/
 │   ├── vectorStore.js        # Embedding storage and search
 │   └── rateLimiter.js        # IP-based rate limiting
 ├── scripts/
+│   ├── aggregate_deputados.mjs   # Fetches deputies from Câmara API and inserts into Neon
 │   ├── aggregate_filiados.mjs    # Streams TSE CSV and inserts into Neon
 │   ├── index_pdf.mjs             # Index PDFs from data/books/
 │   ├── generate_embeddings.mjs   # Generate embeddings for items without vectors
@@ -272,6 +276,7 @@ User
 | `npm run generate:embeddings` | Fill in missing embeddings |
 | `node scripts/migrate_to_pinecone.mjs` | Upload vectors from store.json to Pinecone |
 | `node scripts/aggregate_filiados.mjs ./tse_data` | Process TSE CSV and insert into Neon |
+| `node scripts/aggregate_deputados.mjs` | Fetch deputies from Câmara API and insert into Neon |
 
 ---
 

@@ -37,6 +37,7 @@ Esta aplicação web permite explorar o conteúdo do Livro Amarelo por meio de p
 - **Rate limiting** — 10 req/min e 50 req/dia por IP via Sliding Window (`@upstash/ratelimit`) · apenas requisições bloqueadas são registradas na chave `rl:blocked` do Redis (lista persistente, sem TTL, timestamp em horário de Brasília) · fallback em memória (dev local)
 - **Respostas concretas** — o modelo é instruído a citar apenas propostas explícitas do documento
 - **Compartilhamento** — botões para copiar texto ou baixar a resposta como imagem JPEG
+- **Deputados federais** — página `/deputados` com composição da Câmara por partido e estado, via API da Câmara dos Deputados; nome do partido via join com a base de filiados
 - **Filiados partidários** — página `/filiados` com dados de filiação por partido e estado, atualizada automaticamente toda segunda-feira via GitHub Actions a partir dos dados públicos do TSE
 - **Responsivo** — layout adaptado para desktop e dispositivos móveis
 
@@ -65,16 +66,18 @@ Esta aplicação web permite explorar o conteúdo do Livro Amarelo por meio de p
 livro-amarelo/
 ├── .github/
 │   └── workflows/
-│       └── update-filiados.yml   # Cron semanal: baixa dados do TSE e atualiza o banco
+│       └── update-filiados.yml   # Cron semanal: atualiza filiados (TSE) e deputados (Câmara API)
 ├── pages/
 │   ├── index.js              # Página de verificação (Turnstile)
 │   ├── inicio.js             # Interface de perguntas e respostas
+│   ├── deputados.js          # Página de deputados federais por partido e estado
 │   ├── filiados.js           # Página de filiados partidários por estado
 │   ├── sobre.js              # Página sobre o projeto
 │   ├── privacidade.js        # Política de privacidade
 │   ├── _app.js               # App wrapper — CSS global + Google Analytics
 │   └── api/
 │       ├── chat.js           # Endpoint principal RAG + LLM
+│       ├── deputados.js      # Endpoint de deputados (Neon + join com filiados para nome do partido)
 │       └── filiados.js       # Endpoint de filiados (lê do Neon Postgres)
 ├── hooks/
 │   └── useTurnstile.js       # Hook React para o widget Turnstile
@@ -84,6 +87,7 @@ livro-amarelo/
 │   ├── vectorStore.js        # Armazenamento e busca de embeddings
 │   └── rateLimiter.js        # Rate limiting por IP
 ├── scripts/
+│   ├── aggregate_deputados.mjs   # Busca deputados na API da Câmara e insere no Neon
 │   ├── aggregate_filiados.mjs    # Processa CSV do TSE (streaming) e insere no Neon
 │   ├── index_pdf.mjs             # Indexar PDFs da pasta data/books/
 │   ├── generate_embeddings.mjs   # Gerar embeddings para itens sem vetor
@@ -272,6 +276,7 @@ Usuário
 | `npm run generate:embeddings` | Preencher embeddings ausentes |
 | `node scripts/migrate_to_pinecone.mjs` | Enviar vetores do store.json para o Pinecone |
 | `node scripts/aggregate_filiados.mjs ./tse_data` | Processar CSV do TSE e inserir no Neon |
+| `node scripts/aggregate_deputados.mjs` | Buscar deputados na API da Câmara e inserir no Neon |
 
 ---
 
