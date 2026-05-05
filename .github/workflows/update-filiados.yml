@@ -1,0 +1,38 @@
+name: Atualizar filiados partidários
+
+on:
+  schedule:
+    - cron: '0 11 * * 1'  # toda segunda-feira às 08:00 BRT (11:00 UTC)
+  workflow_dispatch:       # permite disparo manual
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Baixar dados do TSE
+        run: |
+          wget -q --show-progress -O filiacao.zip \
+            "https://cdn.tse.jus.br/estatistica/sead/odsele/filiacao_partidaria/perfil_filiacao_partidaria.zip"
+          mkdir -p tse_data
+          unzip -q filiacao.zip -d tse_data/
+          echo "Arquivos extraídos:"
+          ls -lh tse_data/
+
+      - name: Agregar e inserir no banco
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/aggregate_filiados.mjs ./tse_data
+
+      - name: Limpar arquivos temporários
+        if: always()
+        run: rm -rf filiacao.zip tse_data/
