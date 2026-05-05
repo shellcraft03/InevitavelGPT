@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 // Adicionar novas páginas aqui — o dropdown atualiza automaticamente
 const PAGES = [
   { href: '/inicio',       label: 'Início'      },
+  { href: '/filiados',     label: 'Filiados'    },
   { href: '/sobre',        label: 'Sobre'       },
   { href: '/privacidade',  label: 'Privacidade' },
 ];
