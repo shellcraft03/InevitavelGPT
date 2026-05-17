@@ -3,11 +3,21 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import requests
+from requests_oauthlib import OAuth1
 
 from .crypto import decrypt_secret, encrypt_secret
 
 X_CLIENT_ID = os.environ['X_CLIENT_ID']
 X_CLIENT_SECRET = os.environ.get('X_CLIENT_SECRET', '').strip()
+
+_BOT_CONSUMER_KEY = os.environ['BOT_CONSUMER_KEY']
+_BOT_CONSUMER_SECRET = os.environ['BOT_CONSUMER_SECRET']
+_BOT_ACCESS_TOKEN = os.environ['BOT_ACCESS_TOKEN']
+_BOT_ACCESS_TOKEN_SECRET = os.environ['BOT_ACCESS_TOKEN_SECRET']
+
+
+def _bot_oauth1():
+    return OAuth1(_BOT_CONSUMER_KEY, _BOT_CONSUMER_SECRET, _BOT_ACCESS_TOKEN, _BOT_ACCESS_TOKEN_SECRET)
 
 TOKEN_URL = 'https://api.x.com/2/oauth2/token'
 TWEET_TEXT = 'Faca perguntas, verifique as fontes.\nVisite: https://www.inevitavelgpt.com/'
@@ -97,10 +107,10 @@ def get_user_tweets(x_user_id, access_token, start_time, max_results):
     return sorted(tweets, key=lambda item: item.get('created_at') or '')
 
 
-def upload_media(image_bytes, access_token):
+def upload_media(image_bytes):
     response = requests.post(
         'https://api.x.com/2/media/upload',
-        headers={**_bearer(access_token), 'Content-Type': 'application/json'},
+        auth=_bot_oauth1(),
         json={
             'media': base64.b64encode(image_bytes).decode(),
             'media_category': 'tweet_image',
@@ -113,10 +123,11 @@ def upload_media(image_bytes, access_token):
     return data.get('id') or data.get('media_id_string')
 
 
-def create_reply(media_id, reply_to_id, access_token):
+def create_reply(media_id, reply_to_id):
+    import logging
     response = requests.post(
         'https://api.x.com/2/tweets',
-        headers={**_bearer(access_token), 'Content-Type': 'application/json'},
+        auth=_bot_oauth1(),
         json={
             'text': TWEET_TEXT,
             'media': {'media_ids': [str(media_id)]},
@@ -124,6 +135,8 @@ def create_reply(media_id, reply_to_id, access_token):
         },
         timeout=30,
     )
+    if not response.ok:
+        logging.error('create_reply %s: %s', response.status_code, response.text[:500])
     response.raise_for_status()
     data = response.json()
     data['_http_status'] = response.status_code
