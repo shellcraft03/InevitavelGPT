@@ -41,8 +41,6 @@ export default function Privacidade() {
               auditoria do recurso:
               <ul style={s.list}>
                 <li><strong>Identidade pública da conta X/Twitter</strong> — ID da conta, @usuário, nome exibido e imagem pública de perfil.</li>
-                <li><strong>Tokens OAuth</strong> — tokens de acesso e renovação fornecidos pela X/Twitter para executar a integração autorizada. Esses tokens são armazenados criptografados.</li>
-                <li><strong>Escopos e estado da conexão</strong> — permissões concedidas, data de expiração, renovação e eventual revogação da conexão.</li>
                 <li><strong>Status de acesso</strong> — situação na lista de espera, aprovação manual, plano, limites, datas de aprovação ou expiração e observações administrativas.</li>
                 <li><strong>Configurações do bot</strong> — ativação ou pausa, modo de operação, fonte selecionada, gatilhos, limites diários e preferências relacionadas.</li>
                 <li><strong>Histórico de execução</strong> — tweets ou textos processados, respostas geradas, indicação de imagem gerada, tweet publicado, erros, horários e contadores de uso.</li>
@@ -70,7 +68,7 @@ export default function Privacidade() {
                 <li><strong>Cloudflare Turnstile</strong> — verificação anti-bot</li>
                 <li><strong>Google Analytics</strong> — análise de uso</li>
                 <li><strong>OpenAI</strong> — processamento das perguntas via modelo de linguagem</li>
-                <li><strong>X/Twitter</strong> — autenticação OAuth, leitura de dados autorizados e publicação de replies quando você usar o Bot X/Twitter</li>
+                <li><strong>X/Twitter</strong> — autenticação OAuth e publicação de replies quando você usar o Bot X/Twitter</li>
               </ul>
               <p style={{ marginTop: '12px' }}>Cada serviço possui sua própria política de privacidade.</p>
             </Section>
