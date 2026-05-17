@@ -1,4 +1,5 @@
 import base64
+import json
 import os
 from datetime import datetime, timedelta, timezone
 
@@ -108,16 +109,20 @@ def get_user_tweets(x_user_id, access_token, start_time, max_results):
 
 
 def upload_media(image_bytes):
+    import logging
     response = requests.post(
         'https://api.x.com/2/media/upload',
         auth=_bot_oauth1(),
-        json={
+        data=json.dumps({
             'media': base64.b64encode(image_bytes).decode(),
             'media_category': 'tweet_image',
             'media_type': 'image/jpeg',
-        },
+        }),
+        headers={'Content-Type': 'application/json'},
         timeout=90,
     )
+    if not response.ok:
+        logging.error('upload_media %s: %s', response.status_code, response.text[:500])
     response.raise_for_status()
     data = response.json().get('data') or {}
     return data.get('id') or data.get('media_id_string')
@@ -128,11 +133,12 @@ def create_reply(media_id, reply_to_id):
     response = requests.post(
         'https://api.x.com/2/tweets',
         auth=_bot_oauth1(),
-        json={
+        data=json.dumps({
             'text': TWEET_TEXT,
             'media': {'media_ids': [str(media_id)]},
             'reply': {'in_reply_to_tweet_id': str(reply_to_id)},
-        },
+        }),
+        headers={'Content-Type': 'application/json'},
         timeout=30,
     )
     if not response.ok:
