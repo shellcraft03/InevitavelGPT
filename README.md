@@ -334,9 +334,9 @@ Usuário
 
 ## Bot X/Twitter multiusuário
 
-O diretório `BotTwitter2/` contém o **worker Python** implantado no **Railway** para operar o Bot X/Twitter com contas de usuários autenticados. O objetivo do projeto é permitir que qualquer usuário autorizado conecte sua própria conta X/Twitter e publique respostas automáticas pela própria conta, respeitando saldo, status de acesso e permissões OAuth.
+O diretório `BotTwitter2/` contém o **worker Python** implantado no **Railway** para operar o Bot X/Twitter com contas de usuários autenticados. O usuário conecta sua conta X/Twitter apenas com permissão de **leitura** — o worker monitora seus tweets, mas quem publica as respostas é o perfil **@Inevitavel_Bot**, usando credenciais OAuth 1.0a próprias do bot.
 
-O fluxo novo usa OAuth da X/Twitter, tokens criptografados no Neon e controle de acesso por usuário. O worker busca tweets recentes da conta conectada e só considera publicações que mencionem a palavra-chave `InevitavelGPT` junto com "livro amarelo" ou "renan santos". Depois gera a resposta via RAG, cria a imagem e publica o reply pela conta autenticada.
+O fluxo usa OAuth 2.0 (leitura) para o usuário e OAuth 1.0a (escrita) para o bot. O worker busca tweets recentes da conta conectada e só considera publicações que mencionem `@Inevitavel_Bot` e contenham a palavra-chave configurada em `INEVITAVEL_GPT_KEYWORD` junto com "livro amarelo" ou "renan santos". Depois gera a resposta via RAG, cria a imagem e publica o reply pelo @Inevitavel_Bot.
 
 Para teste local no Windows, configure `BotTwitter2/InevitavelGPT2/.env` e execute `BotTwitter2/run-local-worker.bat`. O script também pode carregar variáveis do `.env.local` da raiz quando necessário.
 
@@ -358,7 +358,7 @@ Worker BotTwitter2 Railway/local (main.py — loop periódico)
   │
   ▼
 worker.py
-  │ exige palavra-chave InevitavelGPT + tema elegível
+  │ exige menção @Inevitavel_Bot + palavra-chave configurada + tema elegível
   │ respeita DEFAULT_MIN_TWEET_CREATED_AT, cursor por usuário e lookback máximo
   │ extrai pergunta + tipo (livro | entrevistas)
   │
@@ -369,7 +369,7 @@ POST /api/bot/answer  (Vercel · X-Bot-Secret)
 POST /api/bot/image   (Vercel · X-Bot-Secret)
   │ node-canvas + Inter TTF bundled → JPEG 1080px
   ▼
-POST /1.1/media/upload.json → POST /2/tweets (reply ao tweet original)
+OAuth 1.0a @Inevitavel_Bot: upload mídia + reply ao tweet original
   │
   ▼
 saldo debitado em igpt2_access_grants
@@ -394,7 +394,12 @@ cursor por usuário atualizado em igpt2_automation_state
 | `X_CLIENT_SECRET` | Client Secret do app X/Twitter OAuth 2.0, quando aplicável |
 | `BOT_API_URL` | URL de `/api/bot/answer` na Vercel ou localmente (ex.: `https://www.inevitavelgpt.com/api/bot/answer`) |
 | `BOT_API_SECRET` | Mesmo valor de `BOT_API_SECRET` configurado na Vercel |
-| `INEVITAVEL_GPT_KEYWORD` | Palavra-chave obrigatória no tweet; padrão `InevitavelGPT` se ausente |
+| `INEVITAVEL_GPT_KEYWORD` | Palavra-chave obrigatória no tweet (ex.: `GPT`); sem padrão |
+| `IGPT2_BOT_HANDLE` | Handle do bot que publica as respostas (ex.: `@Inevitavel_Bot`); obrigatório |
+| `BOT_CONSUMER_KEY` | API Key do app X/Twitter do bot (OAuth 1.0a) |
+| `BOT_CONSUMER_SECRET` | API Key Secret do app X/Twitter do bot (OAuth 1.0a) |
+| `BOT_ACCESS_TOKEN` | Access Token do perfil @Inevitavel_Bot (OAuth 1.0a) |
+| `BOT_ACCESS_TOKEN_SECRET` | Access Token Secret do perfil @Inevitavel_Bot (OAuth 1.0a) |
 | `DEFAULT_MIN_TWEET_CREATED_AT` | Timestamp mínimo global em UTC/RFC3339 para não processar tweets antigos |
 | `IGPT2_WORKER_INTERVAL_SECONDS` | Intervalo opcional em segundos; padrão local `60`, Railway `300` |
 | `IGPT2_LOCK_SECONDS` | Tempo de lock por conta; padrão `300` |
