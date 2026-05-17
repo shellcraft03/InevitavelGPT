@@ -435,6 +435,6 @@ cursor por usuário atualizado em igpt2_automation_state
 
 <div align="center">
 
-**o Livro Amarelo · O Futuro é Glorioso**
+**InevitávelGPT · O Futuro é Glorioso**
 
 </div>
