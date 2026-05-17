@@ -17,7 +17,10 @@ INTERVAL_SECONDS = int(os.environ.get('IGPT2_WORKER_INTERVAL_SECONDS', '60'))
 MIN_LOOKBACK_DAYS = int(os.environ.get('IGPT2_MIN_LOOKBACK_DAYS', '3'))
 MAX_TWEETS_PER_ACCOUNT = int(os.environ.get('IGPT2_MAX_TWEETS_PER_ACCOUNT', '30'))
 DEFAULT_MIN_TWEET_CREATED_AT = os.environ.get('DEFAULT_MIN_TWEET_CREATED_AT', '').strip()
-TRIGGER_KEYWORD = os.environ.get('INEVITAVEL_GPT_KEYWORD') or os.environ.get('IGPT2_TRIGGER_KEYWORD') or 'InevitavelGPT'
+TRIGGER_KEYWORD = os.environ.get('INEVITAVEL_GPT_KEYWORD') or os.environ.get('IGPT2_TRIGGER_KEYWORD')
+if not TRIGGER_KEYWORD:
+    raise RuntimeError('Missing env var: INEVITAVEL_GPT_KEYWORD or IGPT2_TRIGGER_KEYWORD')
+BOT_HANDLE = os.environ['IGPT2_BOT_HANDLE']
 
 LIVRO_RE = re.compile(r'livro\s+amarelo', re.IGNORECASE)
 RENAN_RE = re.compile(r'renan\s+santos', re.IGNORECASE)
@@ -28,10 +31,17 @@ def _strip_accents(text):
 
 
 TRIGGER_KEYWORD_RE = re.compile(re.escape(_strip_accents(TRIGGER_KEYWORD)), re.IGNORECASE)
+BOT_HANDLE_RE = re.compile(re.escape(_strip_accents(BOT_HANDLE)), re.IGNORECASE)
+
+logging.basicConfig()
+logging.getLogger().info('TRIGGER_KEYWORD=%r BOT_HANDLE=%r', TRIGGER_KEYWORD, BOT_HANDLE)
 
 
 def _parse_tweet(text):
     stripped = _strip_accents(text)
+    if not BOT_HANDLE_RE.search(stripped):
+        return None
+
     match = TRIGGER_KEYWORD_RE.search(stripped)
     if not match:
         return None
@@ -344,11 +354,11 @@ def _process_tweet(conn, account, tweet, access_token, tweet_cost_cents):
 
         image = api.generate_image(parsed['question'], answer, parsed['type'])
         image_generated = True
-        media_id = x_api.upload_media(image, access_token)
+        media_id = x_api.upload_media(image)
         if not media_id:
             raise RuntimeError('X media upload returned no media id')
 
-        reply = x_api.create_reply(media_id, tweet['id'], access_token)
+        reply = x_api.create_reply(media_id, tweet['id'])
         _record_run(
             conn,
             user_id,
