@@ -57,8 +57,8 @@ export default function InevitavelGpt2Entry() {
               <>
                 <h1 style={s.title}>Conecte sua conta X.</h1>
                 <p style={s.copy}>
-                  Conecte sua conta X para participar do Bot X/Twitter. Após a conexão, seu acesso
-                  passa por aprovação manual antes do bot começar a responder suas menções.
+                  Conecte sua conta X para participar do Bot X/Twitter. Após a conexão, faça uma
+                  doação via Pix — o valor é convertido em créditos e o acesso é liberado na hora.
                 </p>
 
                 <a href="/api/inevitavelgpt2/oauth/start" style={s.button}>

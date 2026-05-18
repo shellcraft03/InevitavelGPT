@@ -37,11 +37,11 @@ export default function Privacidade() {
 
             <Section title="Dados do Bot X/Twitter" s={s}>
               Caso você opte por conectar sua conta X/Twitter ao Bot, poderemos coletar e armazenar
-              os dados necessários para autenticação, liberação manual, configuração, operação e
+              os dados necessários para autenticação, configuração, operação e
               auditoria do recurso:
               <ul style={s.list}>
                 <li><strong>Identidade pública da conta X/Twitter</strong> — ID da conta, @usuário, nome exibido e imagem pública de perfil.</li>
-                <li><strong>Status de acesso</strong> — situação na lista de espera, aprovação manual, plano, limites, datas de aprovação ou expiração e observações administrativas.</li>
+                <li><strong>Status de acesso</strong> — situação da conta, saldo de créditos, limites, datas de ativação ou expiração e observações administrativas.</li>
                 <li><strong>Configurações do bot</strong> — ativação ou pausa, modo de operação, fonte selecionada, gatilhos, limites diários e preferências relacionadas.</li>
                 <li><strong>Histórico de execução</strong> — tweets ou textos processados, respostas geradas, indicação de imagem gerada, tweet publicado, erros, horários e contadores de uso.</li>
               </ul>
