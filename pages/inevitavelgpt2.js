@@ -57,8 +57,8 @@ export default function InevitavelGpt2Entry() {
               <>
                 <h1 style={s.title}>Conecte sua conta X.</h1>
                 <p style={s.copy}>
-                  Esta área usa a mesma verificação de sessão do site. Depois de conectar a conta X,
-                  seu acesso entra em análise manual antes da automação ser liberada.
+                  Conecte sua conta X para participar do Bot X/Twitter. Após a conexão, seu acesso
+                  passa por aprovação manual antes do bot começar a responder suas menções.
                 </p>
 
                 <a href="/api/inevitavelgpt2/oauth/start" style={s.button}>
@@ -74,8 +74,7 @@ export default function InevitavelGpt2Entry() {
             )}
 
             <p style={s.note}>
-              O OAuth solicita acesso para ler tweets, publicar replies, enviar mídia e manter a conexão ativa.
-              Voce pode revogar essa permissao a qualquer momento em{' '}
+              O login com X identifica sua conta para controle de saldo e acesso às respostas do bot. Voce pode revogar essa permissao a qualquer momento em{' '}
               <a
                 href="https://x.com/settings/connected_apps"
                 target="_blank"

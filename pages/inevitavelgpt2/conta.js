@@ -148,7 +148,7 @@ export default function BotXTwitterAccount() {
                 {!approved && (
                   <p style={s.notice}>
                     Sua conta já está conectada. A liberação é manual; quando permitida, o bot passará
-                    a monitorar sua conta X.
+                    a responder suas menções ao @Inevitavel_Bot.
                   </p>
                 )}
 
@@ -162,9 +162,9 @@ export default function BotXTwitterAccount() {
               <section style={s.card}>
                 <h2 style={s.sectionTitle}>Como funciona</h2>
                 <p style={s.bodyText}>
-                  O bot responde apenas tweets que mencionem "InevitávelGPT" junto com os termos
-                  "Livro Amarelo" ou "Renan Santos". A resposta é publicada pela sua própria conta X.
-                  Cada resposta publicada consome {formatReais(tweetCostCents)} do saldo disponível.
+                  Mencione @Inevitavel_Bot com a palavra "InevitávelGPT" e os termos "Livro Amarelo"
+                  ou "Renan Santos". O bot detecta a menção e publica a resposta pelo perfil
+                  @Inevitavel_Bot. Cada resposta consome {formatReais(tweetCostCents)} do saldo disponível.
                 </p>
               </section>
 
