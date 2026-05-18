@@ -225,7 +225,7 @@ export default function BotXTwitterAccount() {
                         min="1"
                         max="1000"
                         step="0.01"
-                        placeholder="5"
+                        placeholder="5.00"
                         value={donationAmount}
                         onChange={e => setDonationAmount(e.target.value)}
                         style={s.amountInput}
