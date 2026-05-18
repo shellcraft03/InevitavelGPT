@@ -57,6 +57,7 @@ export default function BotXTwitterAccount() {
   const [runsState, setRunsState] = useState({ loading: true, runs: [], error: null });
   const [balanceState, setBalanceState] = useState({ loading: true, events: [], error: null });
   const [donationAmount, setDonationAmount] = useState('');
+  const [donationFocused, setDonationFocused] = useState(false);
   const [donationLoading, setDonationLoading] = useState(false);
   const [donationError, setDonationError] = useState(null);
   const donationSuccess = router.query.donation === 'success';
@@ -96,7 +97,7 @@ export default function BotXTwitterAccount() {
   }, []);
 
   async function donate() {
-    const amountCents = Math.round(parseFloat(donationAmount) * 100);
+    const amountCents = parseInt(donationAmount, 10) * 100;
     if (!amountCents || amountCents < 100) {
       setDonationError('Valor mínimo: R$ 1,00.');
       return;
@@ -221,13 +222,17 @@ export default function BotXTwitterAccount() {
                     <div style={s.donationRow}>
                       <span style={s.currencyLabel}>R$</span>
                       <input
-                        type="number"
-                        min="1"
-                        max="1000"
-                        step="0.01"
-                        placeholder="5.00"
-                        value={donationAmount}
-                        onChange={e => setDonationAmount(e.target.value)}
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="5,00"
+                        value={
+                          !donationFocused && donationAmount
+                            ? `${donationAmount},00`
+                            : donationAmount
+                        }
+                        onChange={e => setDonationAmount(e.target.value.replace(/[^0-9]/g, ''))}
+                        onFocus={() => setDonationFocused(true)}
+                        onBlur={() => setDonationFocused(false)}
                         style={s.amountInput}
                       />
                       <button
