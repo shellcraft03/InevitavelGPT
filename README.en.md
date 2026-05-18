@@ -2,9 +2,9 @@
 
 **🌐 Language / Idioma:** [English](README.en.md) . [Português](README.md)
 
-# o Livro Amarelo — Q&A
+# InevitávelGPT — Q&A
 
-**Explore O Livro Amarelo and Renan Santos's interviews through natural language questions.**
+**Explore Livro Amarelo and Renan Santos's interviews through natural language questions.**
 
 Retrieval-Augmented Generation with OpenAI · Protected by Cloudflare Turnstile
 
