@@ -204,7 +204,15 @@ export default function BotXTwitterAccount() {
               <section style={s.card}>
                 <h2 style={s.sectionTitle}>Apoie o projeto</h2>
                 {donationSuccess ? (
-                  <p style={s.successNotice}>Doação recebida! O saldo será creditado em instantes.</p>
+                  <div>
+                    <p style={s.successNotice}>Doação recebida! O saldo será creditado em instantes.</p>
+                    <button
+                      onClick={() => router.replace('/inevitavelgpt2/conta', undefined, { shallow: true })}
+                      style={{ ...s.btnSmall, marginTop: 12 }}
+                    >
+                      Fazer nova doação
+                    </button>
+                  </div>
                 ) : (
                   <>
                     <p style={s.bodyText}>
