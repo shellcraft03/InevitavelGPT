@@ -4,7 +4,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const secret = process.env.LIVEPIX_WEBHOOK_SECRET;
-  if (secret && req.query.secret !== secret) {
+  if (!secret) {
+    console.error('[livepix/webhook] LIVEPIX_WEBHOOK_SECRET not set — rejecting all requests');
+    return res.status(500).end();
+  }
+  if (req.query.secret !== secret) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -39,7 +43,7 @@ export default async function handler(req, res) {
 
     await sql`
       INSERT INTO igpt2_balance_events (user_id, delta_cents, source, note, created_at)
-      VALUES (${user_id}, ${amount_cents}, 'livepix', ${`Livepix #${resource.reference}`}, now())
+      VALUES (${user_id}, ${amount_cents}, 'livepix', 'Livepix', now())
     `;
 
     console.log('[livepix/webhook] Credited %d cents to user_id=%s ref=%s', amount_cents, user_id, resource.reference);
