@@ -7,9 +7,9 @@ const MAX_CENTS = 100000;
 
 function getRedirectUrl(req) {
   const configured = process.env.NEXT_PUBLIC_SITE_URL || process.env.IGPT2_BASE_URL;
-  if (configured) return `${configured.replace(/\/$/, '')}/inevitavelgpt2/conta?donation=success`;
+  if (configured) return `${configured.replace(/\/$/, '')}/inevitavelgpt2/conta?donation=pending`;
   const proto = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
-  return `${proto}://${req.headers.host}/inevitavelgpt2/conta?donation=success`;
+  return `${proto}://${req.headers.host}/inevitavelgpt2/conta?donation=pending`;
 }
 
 export default async function handler(req, res) {
