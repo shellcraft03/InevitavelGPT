@@ -75,10 +75,12 @@ export default function Header({ currentPage, dark, toggleDark, onCurrentPageCli
         )}
         <a href="/" style={s.headerLogo}>
           <img src="/Imagem3.png" alt="" style={s.headerThumb} />
-          <div style={s.headerTextWrap}>
-            <div style={s.headerTitle}>Inevitável GPT</div>
-            {!isMobile && <div style={s.headerSub}>O Futuro é Glorioso</div>}
-          </div>
+          {!isMobile && (
+            <div style={s.headerTextWrap}>
+              <div style={s.headerTitle}>Inevitável GPT</div>
+              <div style={s.headerSub}>O Futuro é Glorioso</div>
+            </div>
+          )}
         </a>
         <nav style={s.nav}>
           <button onClick={toggleDark} style={s.darkToggle} title={dark ? 'Modo claro' : 'Modo escuro'}>
