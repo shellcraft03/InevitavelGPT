@@ -251,18 +251,14 @@ export default function BotXTwitterAccount() {
               <section style={s.card}>
                 <h2 style={s.sectionTitle}>Permissao da X/Twitter</h2>
                 <p style={s.bodyText}>
-                  Se você revogar o aplicativo nas configurações da X/Twitter, basta reconectar a conta
-                  para liberar novamente o acesso.
+                  Você pode revogar o acesso do aplicativo a qualquer momento nas configurações da X/Twitter.
                 </p>
                 <div style={s.actions}>
-                  <a href="/api/inevitavelgpt2/oauth/start" style={s.buttonLink}>
-                    Reconectar conta X
-                  </a>
                   <a
                     href="https://x.com/settings/connected_apps"
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={s.secondaryLink}
+                    style={s.dangerLink}
                   >
                     Revogar na X/Twitter
                   </a>
@@ -591,6 +587,19 @@ function getStyles(dark) {
       fontSize: 13,
       fontWeight: 700,
       marginTop: 8,
+    },
+    dangerLink: {
+      display: 'inline-flex',
+      minHeight: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: dark ? '#201C12' : '#FFF7E0',
+      color: dark ? '#FCBF22' : '#7A5800',
+      border: '2px solid #FCBF22',
+      borderRadius: 8,
+      padding: '0 14px',
+      fontWeight: 900,
+      textDecoration: 'none',
     },
     secondaryButton: {
       minHeight: 40,
