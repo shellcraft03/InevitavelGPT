@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import Header from '../../components/Header';
 import { useDarkMode } from '../../hooks/useDarkMode';
 import { useSessionGate } from '../../hooks/useSessionGate';
@@ -50,10 +51,15 @@ function formatDate(value) {
 }
 
 export default function BotXTwitterAccount() {
+  const router = useRouter();
   const [dark, toggleDark] = useDarkMode();
   const [state, setState] = useState({ loading: true, user: null, error: null });
   const [runsState, setRunsState] = useState({ loading: true, runs: [], error: null });
   const [balanceState, setBalanceState] = useState({ loading: true, events: [], error: null });
+  const [donationAmount, setDonationAmount] = useState('');
+  const [donationLoading, setDonationLoading] = useState(false);
+  const [donationError, setDonationError] = useState(null);
+  const donationSuccess = router.query.donation === 'success';
   useSessionGate();
 
   useEffect(() => {
@@ -88,6 +94,33 @@ export default function BotXTwitterAccount() {
     }
     load();
   }, []);
+
+  async function donate() {
+    const amountCents = Math.round(parseFloat(donationAmount) * 100);
+    if (!amountCents || amountCents < 100) {
+      setDonationError('Valor mínimo: R$ 1,00.');
+      return;
+    }
+    setDonationLoading(true);
+    setDonationError(null);
+    try {
+      const res = await fetch('/api/livepix/create-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amountCents }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDonationError(data.error || 'Erro ao criar pagamento.');
+        setDonationLoading(false);
+        return;
+      }
+      window.location.assign(data.checkoutUrl);
+    } catch {
+      setDonationError('Não foi possível conectar. Tente novamente.');
+      setDonationLoading(false);
+    }
+  }
 
   async function logout() {
     await fetch('/api/inevitavelgpt2/logout', { method: 'POST' });
@@ -169,6 +202,40 @@ export default function BotXTwitterAccount() {
               </section>
 
               <section style={s.card}>
+                <h2 style={s.sectionTitle}>Apoie o projeto</h2>
+                {donationSuccess ? (
+                  <p style={s.successNotice}>Doação recebida! O saldo será creditado em instantes.</p>
+                ) : (
+                  <>
+                    <p style={s.bodyText}>
+                      Contribua para manter o projeto no ar. O saldo é creditado automaticamente na sua conta.
+                    </p>
+                    <div style={s.donationRow}>
+                      <span style={s.currencyLabel}>R$</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="1000"
+                        step="1"
+                        placeholder="0"
+                        value={donationAmount}
+                        onChange={e => setDonationAmount(e.target.value)}
+                        style={s.amountInput}
+                      />
+                      <button
+                        onClick={donate}
+                        disabled={donationLoading || !donationAmount}
+                        style={donationLoading || !donationAmount ? s.btnDisabledSmall : s.btnSmall}
+                      >
+                        {donationLoading ? 'Aguarde...' : 'Doar'}
+                      </button>
+                    </div>
+                    {donationError && <p style={s.errorSmall}>{donationError}</p>}
+                  </>
+                )}
+              </section>
+
+              <section style={s.card}>
                 <h2 style={s.sectionTitle}>Permissao da X/Twitter</h2>
                 <p style={s.bodyText}>
                   Se você revogar o aplicativo nas configurações da X/Twitter, basta reconectar a conta
@@ -242,7 +309,7 @@ export default function BotXTwitterAccount() {
                             </div>
                             <p style={s.logDelta}>{formatBalanceDelta(event.delta_cents)}</p>
                             {event.note && <p style={s.logText}>{event.note}</p>}
-                            <p style={s.logMeta}>{event.source === 'bot' ? 'Automacao' : 'Admin'}</p>
+                            <p style={s.logMeta}>{event.source === 'bot' ? 'Automacao' : event.source === 'livepix' ? 'Livepix' : 'Admin'}</p>
                           </div>
                         ))}
                       </div>
@@ -454,6 +521,63 @@ function getStyles(dark) {
       fontSize: 12,
       fontWeight: 900,
       textTransform: 'uppercase',
+    },
+    donationRow: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 4,
+    },
+    currencyLabel: {
+      fontWeight: 800,
+      fontSize: 16,
+      color: text1,
+    },
+    amountInput: {
+      width: 100,
+      padding: '8px 10px',
+      fontSize: 16,
+      fontWeight: 700,
+      border: `2px solid ${border}`,
+      borderRadius: 8,
+      background: cardBg,
+      color: text1,
+      outline: 'none',
+    },
+    btnSmall: {
+      minHeight: 40,
+      padding: '0 16px',
+      background: '#FCBF22',
+      color: '#000000',
+      border: '2px solid #000000',
+      borderRadius: 8,
+      fontWeight: 900,
+      cursor: 'pointer',
+    },
+    btnDisabledSmall: {
+      minHeight: 40,
+      padding: '0 16px',
+      background: dark ? '#2A2A2A' : '#F2F2F2',
+      color: muted,
+      border: `2px solid ${dark ? '#2A2A2A' : '#F2F2F2'}`,
+      borderRadius: 8,
+      fontWeight: 900,
+      cursor: 'not-allowed',
+    },
+    successNotice: {
+      background: dark ? '#0D1F12' : '#E6F4EA',
+      border: '2px solid #147A26',
+      borderRadius: 8,
+      color: dark ? '#5CCC6E' : '#147A26',
+      padding: 12,
+      fontWeight: 700,
+      lineHeight: 1.5,
+    },
+    errorSmall: {
+      color: '#CC0000',
+      fontSize: 13,
+      fontWeight: 700,
+      marginTop: 8,
     },
     secondaryButton: {
       minHeight: 40,
