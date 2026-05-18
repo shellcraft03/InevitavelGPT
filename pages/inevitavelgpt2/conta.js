@@ -181,8 +181,8 @@ export default function BotXTwitterAccount() {
 
                 {!approved && (
                   <p style={s.notice}>
-                    Sua conta já está conectada. A liberação é manual; quando permitida, o bot passará
-                    a responder suas menções ao @Inevitavel_Bot.
+                    Sua conta está conectada. Para ativar o acesso, faça uma doação na seção abaixo —
+                    cada real doado é convertido em crédito para usar no bot.
                   </p>
                 )}
 
