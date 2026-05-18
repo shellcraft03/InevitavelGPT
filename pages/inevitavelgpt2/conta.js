@@ -254,7 +254,15 @@ export default function BotXTwitterAccount() {
               <section style={s.card}>
                 <h2 style={s.sectionTitle}>Apoie o projeto</h2>
                 {donationStatus === 'checking' ? (
-                  <p style={s.pendingNotice}>Verificando seu pagamento...</p>
+                  <div>
+                    <p style={s.pendingNotice}>Verificando seu pagamento...</p>
+                    <button
+                      onClick={() => router.replace('/inevitavelgpt2/conta', undefined, { shallow: true })}
+                      style={{ ...s.btnSmall, marginTop: 12 }}
+                    >
+                      Fazer doação
+                    </button>
+                  </div>
                 ) : donationStatus === 'confirmed' ? (
                   <div>
                     <p style={s.successNotice}>Doação confirmada! O saldo foi creditado — confira o saldo atualizado e as movimentações abaixo.</p>
@@ -262,17 +270,17 @@ export default function BotXTwitterAccount() {
                       onClick={() => router.replace('/inevitavelgpt2/conta', undefined, { shallow: true })}
                       style={{ ...s.btnSmall, marginTop: 12 }}
                     >
-                      Fazer nova doação
+                      Fazer doação
                     </button>
                   </div>
                 ) : donationStatus === 'not_confirmed' ? (
                   <div>
-                    <p style={s.pendingNotice}>O pagamento não foi detectado. Se você concluiu o pagamento, o saldo será creditado em breve — recarregue a página para confirmar.</p>
+                    <p style={s.pendingNotice}>Nenhum pagamento foi detectado. Se você concluiu o Pix, o saldo chegará em instantes — recarregue a página para confirmar. Se cancelou, clique em "Fazer doação" para tentar novamente.</p>
                     <button
                       onClick={() => router.replace('/inevitavelgpt2/conta', undefined, { shallow: true })}
                       style={{ ...s.btnSmall, marginTop: 12 }}
                     >
-                      Fazer nova doação
+                      Fazer doação
                     </button>
                   </div>
                 ) : (
