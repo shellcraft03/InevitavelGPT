@@ -36,27 +36,25 @@ export default function Privacidade() {
             </Section>
 
             <Section title="Dados do Bot X/Twitter" s={s}>
-              Caso você opte por conectar sua conta X/Twitter ao Bot, poderemos coletar e armazenar
-              os dados necessários para autenticação, configuração, operação e
-              auditoria do recurso:
+              Caso você opte por conectar sua conta X/Twitter ao Bot, armazenamos apenas o que já é
+              público no seu perfil — exatamente o que qualquer pessoa veria ao visitar sua página na
+              plataforma:
               <ul style={s.list}>
-                <li><strong>Identidade pública da conta X/Twitter</strong> — ID da conta, @usuário, nome exibido e imagem pública de perfil.</li>
-                <li><strong>Status de acesso</strong> — situação da conta, saldo de créditos, limites, datas de ativação ou expiração e observações administrativas.</li>
-                <li><strong>Configurações do bot</strong> — ativação ou pausa, modo de operação, fonte selecionada, gatilhos, limites diários e preferências relacionadas.</li>
-                <li><strong>Histórico de execução</strong> — tweets ou textos processados, respostas geradas, indicação de imagem gerada, tweet publicado, erros, horários e contadores de uso.</li>
+                <li><strong>Identidade pública</strong> — ID da conta, @usuário, nome exibido e imagem de perfil, conforme já visíveis publicamente na X/Twitter.</li>
+                <li><strong>Status de acesso</strong> — situação do acesso ao Bot, saldo de créditos, limites e datas relacionadas.</li>
+                <li><strong>Configurações do bot</strong> — preferências que você mesmo define: ativação, limites diários e similares.</li>
+                <li><strong>Registros de execução</strong> — indicadores operacionais como horário, status de envio e contadores de uso. O conteúdo das perguntas e respostas <strong>não é armazenado</strong>.</li>
               </ul>
               <p style={{ marginTop: '12px' }}>
-                Esses dados são usados para operar o bot em nome da conta conectada, evitar respostas
-                duplicadas, aplicar limites, investigar falhas e prevenir abuso. A autorização também
-                pode ser revogada nas configurações da própria X/Twitter.
+                A autorização pode ser revogada a qualquer momento nas configurações da própria X/Twitter.
               </p>
             </Section>
 
             <Section title="O que não coletamos" s={s}>
-              Fora do uso opcional do Bot X/Twitter, nenhum dado pessoal identificável como nome ou
-              e-mail é solicitado. As perguntas feitas nos chats públicos <strong>não são armazenadas
-              por este site</strong>, porém são enviadas à OpenAI para processamento e podem ser
-              retidas nos logs desse serviço, sobre os quais não temos controle. Consulte a{' '}
+              Não coletamos e-mail, nome real, telefone nem qualquer dado pessoal identificável.
+              As perguntas feitas nos chats públicos <strong>não são armazenadas por este site</strong>,
+              porém são enviadas à OpenAI para processamento e podem ser retidas nos logs desse
+              serviço, sobre os quais não temos controle. Consulte a{' '}
               <a href="https://openai.com/pt/policies/privacy-policy/" target="_blank" rel="noopener noreferrer" style={s.link}>política de privacidade da OpenAI</a>{' '}
               para mais informações.
             </Section>
@@ -74,7 +72,7 @@ export default function Privacidade() {
             </Section>
 
             <Section title="Código aberto" s={s}>
-              Todo o código deste site é aberto sob licença MIT.{' '}
+              Todo o código deste site é aberto sob licença MIT, podendo ser auditado a qualquer momento, por qualquer um.{' '}
               <a
                 href="https://github.com/shellcraft03/livro-amarelo"
                 target="_blank"
