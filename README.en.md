@@ -42,6 +42,7 @@ This web application allows users to explore the content of O Livro Amarelo and 
 - **Concrete answers** — the model cites only what is explicitly found in the indexed sources
 - **Federal deputies** — `/deputados` page showing Chamber of Deputies composition by party and state, via the Câmara dos Deputados API
 - **Party membership data** — `/filiados` page showing party affiliation counts by state, automatically updated every Monday via GitHub Actions from public TSE data
+- **Pix donations (Livepix)** — Bot X/Twitter users donate via Pix; balance is credited automatically via webhook and converted into bot usage credits
 - **Responsive** — layout adapted for desktop and mobile devices
 
 ---
@@ -63,6 +64,7 @@ This web application allows users to explore the content of O Livro Amarelo and 
 | Data automation | GitHub Actions (weekly cron + manual trigger) |
 | Image generation (bot) | canvas (node-canvas) · Inter TTF bundled in `public/fonts/` |
 | Bot X/Twitter | Python 3.11 · Railway (multi-user worker) · X API v2 |
+| Payments | Livepix (Pix) — webhook for automatic balance crediting |
 
 ---
 
@@ -91,9 +93,12 @@ livro-amarelo/
 │       ├── videos.js                # GET indexed list · POST suggestion submission
 │       ├── deputados.js             # Deputies endpoint (Neon + join with filiados)
 │       ├── filiados.js              # Party membership endpoint (Neon Postgres)
-│       └── bot/
-│           ├── answer.js            # RAG for the bot — returns { answer, question, type } (X-Bot-Secret)
-│           └── image.js             # Generates 1080px JPEG with node-canvas + Inter TTF (X-Bot-Secret)
+│       ├── bot/
+│       │   ├── answer.js            # RAG for the bot — returns { answer, question, type } (X-Bot-Secret)
+│       │   └── image.js             # Generates 1080px JPEG with node-canvas + Inter TTF (X-Bot-Secret)
+│       └── livepix/
+│           ├── create-payment.js    # Creates Pix charge via Livepix and stores reference in Neon
+│           └── webhook.js           # Receives payment confirmation and credits user balance
 ├── hooks/
 │   ├── useTurnstile.js              # React hook for the Turnstile widget
 │   └── useSessionGate.js            # React hook to verify session via cookie and redirect if invalid
@@ -194,6 +199,12 @@ BLOCKED_YOUTUBE_CHANNEL_NAMES=...
 
 # Twitter bot — protects /api/bot/answer and /api/bot/image
 BOT_API_SECRET=...
+
+# Livepix (Pix payments — Bot X/Twitter)
+LIVEPIX_CLIENT_ID=...
+LIVEPIX_CLIENT_SECRET=...
+LIVEPIX_WEBHOOK_SECRET=...     # required; protects /api/livepix/webhook
+NEXT_PUBLIC_SITE_URL=https://www.inevitavelgpt.com  # used to build the checkout return URL
 ```
 
 > **Pinecone:** the project uses two indexes. `PINECONE_INDEX_LIVRO`: dimension **3072**, compatible with `text-embedding-3-large`, namespace `livro-amarelo-v2` (Livro Amarelo). `PINECONE_INDEX_ENTREVISTAS`: dimension **3072**, compatible with `text-embedding-3-large`, namespace `entrevistas` (YouTube).
@@ -204,7 +215,7 @@ BOT_API_SECRET=...
 
 The Bot X/Twitter admin panel was prepared as a separate application, intended for local execution and maintenance in a private repository. For security reasons, this public repository does not contain an admin page, `/api/.../admin` routes, admin authentication, an admin secret, or the panel files.
 
-That external panel uses the same Neon database as this project to operate Bot X/Twitter access and billing. The implemented logic works with the `igpt2_users`, `igpt2_access_grants`, `igpt2_balance_events`, `igpt2_global_settings`, `igpt2_automation_runs`, and `igpt2_automation_state` tables.
+That external panel uses the same Neon database as this project to operate Bot X/Twitter access and billing. The implemented logic works with the `igpt2_users`, `igpt2_access_grants`, `igpt2_balance_events`, `igpt2_global_settings`, `igpt2_automation_runs`, `igpt2_automation_state`, and `igpt2_livepix_payments` tables.
 
 External panel responsibilities:
 
