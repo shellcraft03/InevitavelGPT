@@ -1,5 +1,5 @@
 import Head from 'next/head';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Header from '../../components/Header';
 import { useDarkMode } from '../../hooks/useDarkMode';
@@ -60,10 +60,13 @@ export default function BotXTwitterAccount() {
   const [donationFocused, setDonationFocused] = useState(false);
   const [donationLoading, setDonationLoading] = useState(false);
   const [donationError, setDonationError] = useState(null);
-  const donationSuccess = router.query.donation === 'success';
+  const [donationStatus, setDonationStatus] = useState(null); // null | 'checking' | 'confirmed' | 'not_confirmed'
+  const initiatedAtRef = useRef(null);
+  const donationPending = router.query.donation === 'pending';
   useSessionGate();
 
   useEffect(() => {
+    if (!router.isReady) return;
     async function load() {
       const res = await fetch('/api/inevitavelgpt2/me');
       if (res.status === 401) {
@@ -92,9 +95,54 @@ export default function BotXTwitterAccount() {
       } else {
         setBalanceState({ loading: false, events: [], error: 'Não foi possível carregar as movimentações.' });
       }
+
+      if (donationPending) {
+        const stored = localStorage.getItem('igpt2_donation_initiated_at');
+        initiatedAtRef.current = stored ? new Date(stored) : new Date();
+        setDonationStatus('checking');
+      }
     }
     load();
-  }, []);
+  }, [router.isReady]);
+
+  useEffect(() => {
+    if (donationStatus !== 'checking') return;
+    let cancelled = false;
+    let attempts = 0;
+
+    async function poll() {
+      if (cancelled) return;
+      attempts++;
+      try {
+        const r = await fetch('/api/inevitavelgpt2/balance-events');
+        if (r.ok && !cancelled) {
+          const d = await r.json();
+          const initiatedAt = initiatedAtRef.current;
+          const found = (d.events || []).find(
+            e => e.source === 'livepix' && initiatedAt && new Date(e.created_at) >= initiatedAt
+          );
+          if (found) {
+            setBalanceState({ loading: false, events: d.events || [], error: null });
+            const meRes = await fetch('/api/inevitavelgpt2/me');
+            if (meRes.ok && !cancelled) {
+              const meData = await meRes.json();
+              setState(prev => ({ ...prev, user: meData.user }));
+            }
+            localStorage.removeItem('igpt2_donation_initiated_at');
+            if (!cancelled) setDonationStatus('confirmed');
+            return;
+          }
+        }
+      } catch {}
+      if (!cancelled) {
+        if (attempts < 10) setTimeout(poll, 3000);
+        else setDonationStatus('not_confirmed');
+      }
+    }
+
+    const timer = setTimeout(poll, 2000);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [donationStatus]);
 
   async function donate() {
     const amountCents = parseInt(donationAmount, 10) * 100;
@@ -116,6 +164,7 @@ export default function BotXTwitterAccount() {
         setDonationLoading(false);
         return;
       }
+      localStorage.setItem('igpt2_donation_initiated_at', new Date().toISOString());
       window.location.assign(data.checkoutUrl);
     } catch {
       setDonationError('Não foi possível conectar. Tente novamente.');
@@ -204,9 +253,21 @@ export default function BotXTwitterAccount() {
 
               <section style={s.card}>
                 <h2 style={s.sectionTitle}>Apoie o projeto</h2>
-                {donationSuccess ? (
+                {donationStatus === 'checking' ? (
+                  <p style={s.pendingNotice}>Verificando seu pagamento...</p>
+                ) : donationStatus === 'confirmed' ? (
                   <div>
-                    <p style={s.successNotice}>Doação recebida! O saldo já foi creditado — confira o saldo atualizado e a movimentação na seção abaixo. Você já pode começar a fazer perguntas no X/Twitter.</p>
+                    <p style={s.successNotice}>Doação confirmada! O saldo foi creditado — confira o saldo atualizado e as movimentações abaixo.</p>
+                    <button
+                      onClick={() => router.replace('/inevitavelgpt2/conta', undefined, { shallow: true })}
+                      style={{ ...s.btnSmall, marginTop: 12 }}
+                    >
+                      Fazer nova doação
+                    </button>
+                  </div>
+                ) : donationStatus === 'not_confirmed' ? (
+                  <div>
+                    <p style={s.pendingNotice}>O pagamento não foi detectado. Se você concluiu o pagamento, o saldo será creditado em breve — recarregue a página para confirmar.</p>
                     <button
                       onClick={() => router.replace('/inevitavelgpt2/conta', undefined, { shallow: true })}
                       style={{ ...s.btnSmall, marginTop: 12 }}
@@ -580,6 +641,15 @@ function getStyles(dark) {
       color: dark ? '#5CCC6E' : '#147A26',
       padding: 12,
       fontWeight: 700,
+      lineHeight: 1.5,
+    },
+    pendingNotice: {
+      background: dark ? '#201C12' : '#FFF7E0',
+      border: '2px solid #FCBF22',
+      borderRadius: 8,
+      color: dark ? '#CCCCCC' : '#333333',
+      padding: 12,
+      fontWeight: 600,
       lineHeight: 1.5,
     },
     errorSmall: {
