@@ -257,7 +257,7 @@ export default function BotXTwitterAccount() {
                   <div>
                     <p style={s.pendingNotice}>Verificando seu pagamento...</p>
                     <button
-                      onClick={() => router.replace('/inevitavelgpt2/conta', undefined, { shallow: true })}
+                      onClick={() => { setDonationStatus(null); router.replace('/inevitavelgpt2/conta', undefined, { shallow: true }); }}
                       style={{ ...s.btnSmall, marginTop: 12 }}
                     >
                       Fazer doação
@@ -267,7 +267,7 @@ export default function BotXTwitterAccount() {
                   <div>
                     <p style={s.successNotice}>Doação confirmada! O saldo foi creditado — confira o saldo atualizado e as movimentações abaixo.</p>
                     <button
-                      onClick={() => router.replace('/inevitavelgpt2/conta', undefined, { shallow: true })}
+                      onClick={() => { setDonationStatus(null); router.replace('/inevitavelgpt2/conta', undefined, { shallow: true }); }}
                       style={{ ...s.btnSmall, marginTop: 12 }}
                     >
                       Fazer doação
@@ -277,7 +277,7 @@ export default function BotXTwitterAccount() {
                   <div>
                     <p style={s.pendingNotice}>Nenhum pagamento foi detectado. Se você concluiu o Pix, o saldo chegará em instantes — recarregue a página para confirmar. Se cancelou, clique em "Fazer doação" para tentar novamente.</p>
                     <button
-                      onClick={() => router.replace('/inevitavelgpt2/conta', undefined, { shallow: true })}
+                      onClick={() => { setDonationStatus(null); router.replace('/inevitavelgpt2/conta', undefined, { shallow: true }); }}
                       style={{ ...s.btnSmall, marginTop: 12 }}
                     >
                       Fazer doação
