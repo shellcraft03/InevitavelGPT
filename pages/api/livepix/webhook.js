@@ -31,7 +31,9 @@ export default async function handler(req, res) {
 
     await sql`
       UPDATE igpt2_access_grants
-      SET credit_balance_cents = credit_balance_cents + ${amount_cents}, updated_at = now()
+      SET credit_balance_cents = credit_balance_cents + ${amount_cents},
+          access_status = 'approved',
+          updated_at = now()
       WHERE user_id = ${user_id}
     `;
 
