@@ -9,7 +9,8 @@ from coleta.config import CANDIDATES
 from coleta.db import (ensure_tables, upsert_sentiment, insert_noticias,
                         get_twitter_cursors, save_twitter_cursor,
                         get_existing_news_urls, compute_rss_sentiment,
-                        insert_tweets, compute_twitter_sentiment)
+                        insert_tweets, compute_twitter_sentiment,
+                        clear_rss_today)
 from coleta.rss import fetch_rss
 from coleta.classifier import classify_texts, classify_texts_individual
 from coleta.twitter import fetch_twitter
@@ -44,6 +45,10 @@ def main():
         ensure_tables(conn)
 
         # ── RSS ──────────────────────────────────────────────────────────────
+        if "--reprocess-rss" in sys.argv:
+            clear_rss_today(conn, today)
+            log.info("--reprocess-rss: dados de hoje apagados, reprocessando")
+
         if twitter_only:
             log.info("Modo --twitter-only: pulando RSS e Polymarket")
         if not twitter_only:
