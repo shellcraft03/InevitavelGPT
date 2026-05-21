@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
@@ -46,10 +46,19 @@ function HamburgerIcon() {
   );
 }
 
+function CloseIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="18" y1="6" x2="6" y2="18"/>
+      <line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  );
+}
+
 export default function Header({ currentPage, dark, toggleDark, onCurrentPageClick }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const menuRef = useRef(null);
+  const router = useRouter();
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 640);
@@ -59,14 +68,18 @@ export default function Header({ currentPage, dark, toggleDark, onCurrentPageCli
   }, []);
 
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.body.style.overflow = menuOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [menuOpen]);
 
-  const router = useRouter();
+  useEffect(() => {
+    const reset = () => {
+      setMenuOpen(false);
+      document.body.style.overflow = '';
+    };
+    router.events.on('routeChangeStart', reset);
+    return () => router.events.off('routeChangeStart', reset);
+  }, [router.events]);
   const currentLabel = PAGES.find(p => p.href === `/${currentPage}`)?.label ?? currentPage;
   const s = getStyles(dark, isMobile);
 
@@ -90,7 +103,7 @@ export default function Header({ currentPage, dark, toggleDark, onCurrentPageCli
             {dark ? <SunIcon /> : <MoonIcon />}
           </button>
           {isMobile ? (
-            <div ref={menuRef} style={{ position: 'relative' }}>
+            <>
               <button
                 onClick={() => setMenuOpen(o => !o)}
                 style={s.hamburgerBtn}
@@ -100,26 +113,43 @@ export default function Header({ currentPage, dark, toggleDark, onCurrentPageCli
                 <HamburgerIcon />
               </button>
               {menuOpen && (
-                <div style={s.navDropdown}>
-                  {PAGES.map(page => {
-                    const isActive = page.href === `/${currentPage}`;
-                    return (
-                      <Link
-                        key={page.href}
-                        href={page.href}
-                        style={isActive ? s.navDropdownItemActive : s.navDropdownItem}
-                        onClick={isActive && router.pathname === page.href
-                          ? e => { e.preventDefault(); setMenuOpen(false); onCurrentPageClick?.(); }
-                          : () => setMenuOpen(false)
-                        }
-                      >
-                        {page.label}
-                      </Link>
-                    );
-                  })}
-                </div>
+                <>
+                  <div style={s.backdrop} onClick={() => setMenuOpen(false)} />
+                  <div style={s.offcanvas}>
+                    <div style={s.offcanvasHeader}>
+                      <a href="/" style={s.offcanvasLogo}>
+                        <img src="/Imagem3.png" alt="" style={s.headerThumb} />
+                        <div>
+                          <div style={s.offcanvasTitle}>Inevitável GPT</div>
+                          <div style={s.offcanvasSub}>O Futuro é Glorioso</div>
+                        </div>
+                      </a>
+                      <button onClick={() => setMenuOpen(false)} style={s.closeBtn} aria-label="Fechar menu">
+                        <CloseIcon />
+                      </button>
+                    </div>
+                    <nav>
+                      {PAGES.map(page => {
+                        const isActive = page.href === `/${currentPage}`;
+                        return (
+                          <Link
+                            key={page.href}
+                            href={page.href}
+                            style={isActive ? s.offcanvasLinkActive : s.offcanvasLink}
+                            onClick={isActive && router.pathname === page.href
+                              ? e => { e.preventDefault(); setMenuOpen(false); onCurrentPageClick?.(); }
+                              : () => setMenuOpen(false)
+                            }
+                          >
+                            {page.label}
+                          </Link>
+                        );
+                      })}
+                    </nav>
+                  </div>
+                </>
               )}
-            </div>
+            </>
           ) : (
             <div style={s.desktopLinks}>
               {PAGES.map(page => {
@@ -269,35 +299,85 @@ function getStyles(dark, isMobile = false) {
       whiteSpace: 'nowrap',
       borderBottom: '2px solid #FCBF22',
     },
-    navDropdown: {
-      position: 'absolute',
-      top: 'calc(100% + 6px)',
-      right: 0,
-      background: headerBg,
-      border: `1px solid ${dark ? '#444444' : '#DDDDDD'}`,
-      borderRadius: '10px',
-      overflow: 'hidden',
-      boxShadow: dark ? '0 4px 16px rgba(0,0,0,0.5)' : '0 4px 16px rgba(0,0,0,0.08)',
-      minWidth: '160px',
-      zIndex: 200,
+    backdrop: {
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0,0,0,0.5)',
+      zIndex: 150,
     },
-    navDropdownItem: {
+    offcanvas: {
+      position: 'fixed',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      width: '280px',
+      background: headerBg,
+      borderLeft: `3px solid #FCBF22`,
+      zIndex: 200,
+      overflowY: 'auto',
+      display: 'flex',
+      flexDirection: 'column',
+    },
+    offcanvasHeader: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '14px 16px',
+      borderBottom: `1px solid ${dark ? '#2A2A2A' : '#EEEEEE'}`,
+    },
+    offcanvasLogo: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      textDecoration: 'none',
+    },
+    offcanvasTitle: {
+      color: text1,
+      fontSize: '0.95rem',
+      fontWeight: 900,
+      letterSpacing: '-0.03em',
+    },
+    offcanvasSub: {
+      color: textMuted,
+      fontSize: '0.62rem',
+      fontWeight: 500,
+      letterSpacing: '0.04em',
+      textTransform: 'uppercase',
+      marginTop: '1px',
+    },
+    closeBtn: {
+      background: dark ? '#2A2A2A' : '#F0F0F0',
+      border: 'none',
+      cursor: 'pointer',
+      color: text1,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '36px',
+      height: '36px',
+      borderRadius: '8px',
+      padding: 0,
+      flexShrink: 0,
+    },
+    offcanvasLink: {
       display: 'block',
-      padding: '13px 20px',
+      padding: '16px 20px',
       color: textMuted,
       textDecoration: 'none',
       fontSize: '1rem',
       fontWeight: 500,
+      borderBottom: `1px solid ${dark ? '#2A2A2A' : '#F0F0F0'}`,
     },
-    navDropdownItemActive: {
+    offcanvasLinkActive: {
       display: 'block',
-      padding: '13px 20px 13px 17px',
+      padding: '16px 20px 16px 17px',
       color: text1,
       textDecoration: 'none',
       fontSize: '1rem',
       fontWeight: 700,
-      background: dark ? '#252525' : '#F8F8F8',
+      borderBottom: `1px solid ${dark ? '#2A2A2A' : '#F0F0F0'}`,
       borderLeft: '3px solid #FCBF22',
+      background: dark ? '#252525' : '#F8F8F8',
     },
   };
 }
