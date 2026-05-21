@@ -153,9 +153,6 @@ async function curate(video) {
   try {
     channel = await fetchVideoChannelName(videoId);
   } catch {
-    channel = null;
-  }
-  if (!channel) {
     channel = await fetchChannelFromOembed(videoId);
   }
   if (!channel) {
@@ -167,10 +164,7 @@ async function curate(video) {
     await rejectVideo(id, `Canal bloqueado (${channel})`);
     return;
   }
-
-  if (channel) {
-    console.log(`[${id}] Canal: ${channel}`);
-  }
+  console.log(`[${id}] Canal: ${channel}`);
 
   let full, totalChars;
   try {
