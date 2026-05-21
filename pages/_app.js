@@ -1,3 +1,4 @@
+import NextApp from 'next/app';
 import Script from 'next/script';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import '../styles/globals.css';
@@ -41,12 +42,11 @@ function PullIndicator({ pullY, refreshing, threshold }) {
           <polyline points="6,12 12,19 18,12" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       )}
-      <style>{`@keyframes ptr-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
 
-export default function App({ Component, pageProps }) {
+export default function App({ Component, pageProps, nonce }) {
   const { pullY, refreshing, threshold } = usePullToRefresh();
 
   return (
@@ -54,8 +54,9 @@ export default function App({ Component, pageProps }) {
       <Script
         src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
         strategy="afterInteractive"
+        nonce={nonce}
       />
-      <Script id="google-analytics" strategy="afterInteractive">
+      <Script id="google-analytics" strategy="afterInteractive" nonce={nonce}>
         {`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
@@ -69,3 +70,9 @@ export default function App({ Component, pageProps }) {
     </>
   );
 }
+
+App.getInitialProps = async (appContext) => {
+  const appProps = await NextApp.getInitialProps(appContext);
+  const nonce = appContext.ctx.req?.headers['x-nonce'] ?? '';
+  return { ...appProps, nonce };
+};
