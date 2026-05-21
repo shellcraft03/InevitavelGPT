@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 
 // Adicionar novas páginas aqui — o nav atualiza automaticamente
 const PAGES = [
   { href: '/inicio',                  label: 'O Plano'        },
   { href: '/renan-santos-responde',   label: 'Renan Responde' },
+  { href: '/sentimento',              label: 'Eleições 2026'  },
   { href: '/inevitavelgpt2',          label: 'Bot X/Twitter'  },
   { href: '/sobre',                   label: 'Sobre'          },
   { href: '/privacidade',             label: 'Privacidade'    },
@@ -64,6 +66,7 @@ export default function Header({ currentPage, dark, toggleDark, onCurrentPageCli
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const router = useRouter();
   const currentLabel = PAGES.find(p => p.href === `/${currentPage}`)?.label ?? currentPage;
   const s = getStyles(dark, isMobile);
 
@@ -105,7 +108,7 @@ export default function Header({ currentPage, dark, toggleDark, onCurrentPageCli
                         key={page.href}
                         href={page.href}
                         style={isActive ? s.navDropdownItemActive : s.navDropdownItem}
-                        onClick={isActive
+                        onClick={isActive && router.pathname === page.href
                           ? e => { e.preventDefault(); setMenuOpen(false); onCurrentPageClick?.(); }
                           : () => setMenuOpen(false)
                         }
@@ -126,7 +129,7 @@ export default function Header({ currentPage, dark, toggleDark, onCurrentPageCli
                     key={page.href}
                     href={page.href}
                     style={isActive ? s.desktopLinkActive : s.desktopLink}
-                    onClick={isActive ? e => { e.preventDefault(); onCurrentPageClick?.(); } : undefined}
+                    onClick={isActive && router.pathname === page.href ? e => { e.preventDefault(); onCurrentPageClick?.(); } : undefined}
                   >
                     {page.label}
                   </Link>
