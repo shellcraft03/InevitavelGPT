@@ -9,7 +9,7 @@ from coleta.config import CANDIDATES
 from coleta.db import (ensure_tables, upsert_sentiment, insert_noticias,
                         get_twitter_cursors, save_twitter_cursor,
                         get_existing_news_urls, compute_rss_sentiment,
-                        insert_tweets, compute_twitter_sentiment, clear_all)
+                        insert_tweets, compute_twitter_sentiment)
 from coleta.rss import fetch_rss
 from coleta.classifier import classify_texts, classify_texts_individual
 from coleta.twitter import fetch_twitter
@@ -36,17 +36,12 @@ def _run_twitter_now():
 def main():
     run_twitter  = _run_twitter_now()
     twitter_only = "--twitter-only" in sys.argv
-    reprocess    = "--reprocess" in sys.argv
     BRT = datetime.timezone(datetime.timedelta(hours=-3))
     today = datetime.datetime.now(BRT).date()
     conn = psycopg2.connect(os.environ["DATABASE_URL"])
 
     try:
         ensure_tables(conn)
-
-        if reprocess:
-            clear_all(conn)
-            run_twitter = True  # force Twitter collection on reprocess
 
         # ── RSS ──────────────────────────────────────────────────────────────
         if twitter_only:
@@ -107,8 +102,8 @@ def main():
         if not run_twitter:
             log.info("Twitter: fora do horário configurado, pulado")
         else:
-            cursors = {} if ("--no-cursor" in sys.argv or reprocess) else get_twitter_cursors(conn)
-            twitter_data, new_cursors = fetch_twitter(cursors, max_results=30 if reprocess else None)
+            cursors = {} if "--no-cursor" in sys.argv else get_twitter_cursors(conn)
+            twitter_data, new_cursors = fetch_twitter(cursors)
             for c in CANDIDATES:
                 items = twitter_data[c["slug"]]  # list of {tweet_id, texto}
                 if items:
