@@ -22,4 +22,6 @@ BotTwitter/twitter-worker-and-x-api-notes.md
 BotTwitter/x-api-*.md
 BotTwitter2/**/.env
 BotTwitter2/**/.venv/
+IngestaoSentimento/**/.env
+IngestaoSentimento/.venv/
 twitter-beta.md
