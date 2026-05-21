@@ -43,6 +43,7 @@ This web application allows users to explore the content of O Livro Amarelo and 
 - **Federal deputies** — `/deputados` page showing Chamber of Deputies composition by party and state, via the Câmara dos Deputados API
 - **Party membership data** — `/filiados` page showing party affiliation counts by state, automatically updated every Monday via GitHub Actions from public TSE data
 - **Pix donations (Livepix)** — Bot X/Twitter users donate via Pix; balance is credited automatically via webhook and converted into bot usage credits
+- **2026 election sentiment tracker** — tracks public sentiment for the Brazilian presidential race: collects RSS news, Twitter/X posts, and Polymarket odds; classifies each item per candidate via GPT; displays scores, historical charts, and a daily news list; Python worker deployed on Railway (`IngestaoSentimento/`)
 - **Responsive** — layout adapted for desktop and mobile devices
 
 ---
@@ -64,6 +65,7 @@ This web application allows users to explore the content of O Livro Amarelo and 
 | Data automation | GitHub Actions (weekly cron + manual trigger) |
 | Image generation (bot) | canvas (node-canvas) · Inter TTF bundled in `public/fonts/` |
 | Bot X/Twitter | Python 3.11 · Railway (multi-user worker) · X API v2 |
+| Election sentiment | Python 3.11 · Railway (hourly cron) · OpenAI GPT-4o-mini · X API v2 · Polymarket API |
 | Payments | Livepix (Pix) — webhook for automatic balance crediting |
 
 ---
@@ -83,6 +85,9 @@ livro-amarelo/
 │   ├── entrevistas.js               # Indexed interviews list + submission form
 │   ├── deputados.js                 # Federal deputies by party and state
 │   ├── filiados.js                  # Party membership by state
+│   ├── sentimento.js                # 2026 election sentiment tracker
+│   ├── metodologia-sentimento.js    # Scoring methodology (with live calculation demo)
+│   ├── noticias-sentimento.js       # Daily news with sentiment classifications
 │   ├── sobre.js                     # About page
 │   ├── privacidade.js               # Privacy policy
 │   ├── _app.js                      # App wrapper — global CSS + Google Analytics
@@ -93,6 +98,9 @@ livro-amarelo/
 │       ├── videos.js                # GET indexed list · POST suggestion submission
 │       ├── deputados.js             # Deputies endpoint (Neon + join with filiados)
 │       ├── filiados.js              # Party membership endpoint (Neon Postgres)
+│       ├── sentimento.js            # Sentiment data per candidate (reads from Neon)
+│       ├── noticias-sentimento.js   # Daily news with sentiment classifications
+│       ├── tweets-sentimento.js     # Daily tweets per candidate
 │       ├── bot/
 │       │   ├── answer.js            # RAG for the bot — returns { answer, question, type } (X-Bot-Secret)
 │       │   └── image.js             # Generates 1080px JPEG with node-canvas + Inter TTF (X-Bot-Secret)
@@ -132,17 +140,27 @@ livro-amarelo/
 │       ├── Inter-Bold.ttf
 │       ├── Inter-Italic.ttf
 │       └── Inter-BoldItalic.ttf
-└── BotTwitter2/                     # Multi-user Python worker — Bot X/Twitter (Railway)
-    ├── Procfile                     # worker: python main.py
-    ├── runtime.txt                  # python-3.11
-    ├── requirements.txt
-    ├── main.py                      # worker main loop
-    ├── run-local-worker.bat          # loads local .env and runs the worker on Windows
-    └── InevitavelGPT2/
-        ├── api.py                   # calls /api/bot/answer and /api/bot/image
-        ├── db.py                    # Neon connection
-        ├── worker.py                # multi-user orchestration
-        └── x_api.py                 # mention reads, media upload and reply
+├── BotTwitter2/                     # Multi-user Python worker — Bot X/Twitter (Railway)
+│   ├── Procfile                     # worker: python main.py
+│   ├── runtime.txt                  # python-3.11
+│   ├── requirements.txt
+│   ├── main.py                      # worker main loop
+│   ├── run-local-worker.bat          # loads local .env and runs the worker on Windows
+│   └── InevitavelGPT2/
+│       ├── api.py                   # calls /api/bot/answer and /api/bot/image
+│       ├── db.py                    # Neon connection
+│       ├── worker.py                # multi-user orchestration
+│       └── x_api.py                 # mention reads, media upload and reply
+└── IngestaoSentimento/              # Python worker — 2026 election sentiment tracker (Railway)
+    ├── railway.toml                 # hourly cron; startCommand = python main.py
+    ├── main.py                      # orchestrator: RSS + Twitter + Polymarket
+    └── coleta/
+        ├── config.py                # candidate list and allowed RSS sources
+        ├── classifier.py            # classify_texts_individual via OpenAI
+        ├── db.py                    # Neon tables: upsert, query and migrations
+        ├── rss.py                   # fetch Google News RSS per candidate
+        ├── twitter.py               # fetch tweets via X API (since_id cursor)
+        └── polymarket.py            # fetch odds via public Polymarket API
 ```
 
 ---
@@ -438,6 +456,49 @@ global cursor updated in igpt2_global_settings (bot_mentions_since_id)
 | `node scripts/migrate_to_pinecone.mjs` | Upload vectors from store.json to Pinecone |
 | `node scripts/aggregate_filiados.mjs ./tse_data` | Process TSE CSV and insert into Neon |
 | `node scripts/aggregate_deputados.mjs` | Fetch deputies from Câmara API and insert into Neon |
+
+---
+
+## 2026 Election Sentiment Tracker (IngestaoSentimento)
+
+The `IngestaoSentimento/` directory contains the **Python worker** deployed on **Railway** that collects and classifies sentiment data for the 2026 election tracker.
+
+### What it collects
+
+- **RSS** — Google News per candidate; articles classified individually by GPT as positive, neutral, or negative; only articles published on the current UTC day are processed
+- **Twitter/X** — tweets mentioning each candidate, collected via X API v2 with a `since_id` cursor to avoid reprocessing
+- **Polymarket** — win odds per candidate via the public Polymarket API
+
+### Scoring method
+
+Each source produces a score adjusted for confidence (data volume):
+
+```
+raw        = (% positive − % negative + 100) ÷ 2   [scale 0–100]
+confidence = min(volume / 30, 1)                    [caps at 30 items]
+adjusted   = 50 + (raw − 50) × confidence
+```
+
+Overall score: weighted average of available sources — **Polymarket 80% · News 10% · Twitter 10%**.
+
+### Schedule
+
+The worker runs every hour (`0 * * * *` on Railway). Twitter is collected only at the hours configured in `TWITTER_UTC_HOURS` (default: `15,18,21` = 12:00, 15:00, 18:00 BRT).
+
+### Environment variables — Railway (IngestaoSentimento)
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | Neon — same database as the site |
+| `OPENAI_API_KEY` | For sentiment classification (GPT-4o-mini) |
+| `TWITTER_BEARER_TOKEN` | X API v2 bearer token |
+| `TWITTER_UTC_HOURS` | UTC hours for Twitter collection (default: `15,18,21`) |
+
+### Deploy on Railway
+
+1. Connect the repository to Railway and set the **root directory** to `IngestaoSentimento/`.
+2. Set the environment variables above.
+3. `railway.toml` already defines the cron schedule and start command.
 
 ---
 
