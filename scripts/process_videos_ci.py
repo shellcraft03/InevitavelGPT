@@ -408,11 +408,9 @@ def main():
                 continue
             channel = meta.get('channel')
             if not channel:
-                fallback = fetch_video_metadata(video_id)
-                channel = fallback.get('channel')
+                channel = fetch_channel_from_oembed(video_id)
                 if channel:
                     meta = {**meta, 'channel': channel}
-                    print(f'[{vid_id}] Canal via fallback: {channel}')
                 else:
                     print(f'[{vid_id}] Nome do canal indisponivel, sera tentado novamente.')
                     continue

@@ -142,18 +142,6 @@ def ensure_tables(conn):
     log.info("Tables ready")
 
 
-def clear_all(conn):
-    """Deletes all collected data and resets Twitter cursors for a full reprocess."""
-    with conn.cursor() as cur:
-        cur.execute("DELETE FROM eleicoes_noticias_classificacoes")
-        cur.execute("DELETE FROM eleicoes_noticias")
-        cur.execute("DELETE FROM eleicoes_tweets")
-        cur.execute("DELETE FROM eleicoes_sentimento")
-        cur.execute("DELETE FROM eleicoes_twitter_cursors")
-    conn.commit()
-    log.info("Cleared all data and reset Twitter cursors")
-
-
 def get_existing_news_urls(conn, date):
     """Returns set of URLs already stored for the given date."""
     with conn.cursor() as cur:
