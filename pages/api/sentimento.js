@@ -21,7 +21,7 @@ export default async function handler(req, res) {
         ORDER BY slug
       `,
       sql`
-        SELECT candidato_slug, fonte, data, positivo, neutro, negativo,
+        SELECT candidato_slug, fonte, data::text, positivo, neutro, negativo,
                volume, score_tendencia, odds
         FROM eleicoes_sentimento
         WHERE data >= CURRENT_DATE - INTERVAL '30 days'
