@@ -221,7 +221,7 @@ export default function Sentimento() {
 
                       {row?.data && (
                         <div style={s.dateLabel}>
-                          {row.data.split('-').reverse().join('/')}
+                          {row.data.slice(0, 10).split('-').reverse().join('/')}
                         </div>
                       )}
                     </div>
@@ -254,7 +254,7 @@ export default function Sentimento() {
                           ) : dates.map((date, i) => (
                             <tr key={date} style={i % 2 === 0 ? s.trEven : s.trOdd}>
                               <td style={s.td}>
-                                {date.split('-').slice(1).reverse().join('/')}
+                                {date.slice(0, 10).split('-').slice(1).reverse().join('/')}
                               </td>
                               {candidatos.map(c => {
                                 const row = recentRows(c.slug).find(r => r.data === date);
