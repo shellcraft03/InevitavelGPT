@@ -30,7 +30,7 @@ def _run_twitter_now():
         return True
     raw = os.environ.get("TWITTER_UTC_HOURS", "12,15,18")
     hours = {int(h.strip()) for h in raw.split(",") if h.strip()}
-    return datetime.datetime.utcnow().hour in hours
+    return datetime.datetime.now(datetime.timezone.utc).hour in hours
 
 
 def main():
