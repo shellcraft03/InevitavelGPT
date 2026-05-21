@@ -1,0 +1,4 @@
+# Roda a cada hora. Twitter só nas horas definidas em TWITTER_UTC_HOURS (padrão: "12,20" = 9h e 17h BRT).
+[deploy]
+cronSchedule = "0 * * * *"
+startCommand = "python main.py"
