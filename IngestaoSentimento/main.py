@@ -28,7 +28,7 @@ def _run_twitter_now():
         return False
     if "--twitter-only" in sys.argv:
         return True
-    raw = os.environ.get("TWITTER_UTC_HOURS", "12,15,18")
+    raw = os.environ.get("TWITTER_UTC_HOURS", "15,18,21")
     hours = {int(h.strip()) for h in raw.split(",") if h.strip()}
     return datetime.datetime.now(datetime.timezone.utc).hour in hours
 
