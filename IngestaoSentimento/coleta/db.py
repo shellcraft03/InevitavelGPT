@@ -142,6 +142,24 @@ def ensure_tables(conn):
     log.info("Tables ready")
 
 
+def clear_rss_today(conn, date):
+    """Deletes all RSS news and sentiment for the given date so they can be reprocessed."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            DELETE FROM eleicoes_noticias_classificacoes
+            WHERE noticia_id IN (
+                SELECT id FROM eleicoes_noticias WHERE data = %s
+            )
+        """, (date,))
+        cur.execute("DELETE FROM eleicoes_noticias WHERE data = %s", (date,))
+        cur.execute(
+            "DELETE FROM eleicoes_sentimento WHERE fonte = 'rss' AND data = %s",
+            (date,)
+        )
+    conn.commit()
+    log.info(f"RSS data cleared for {date}")
+
+
 def get_existing_news_urls(conn, date):
     """Returns set of URLs already stored for the given date."""
     with conn.cursor() as cur:
