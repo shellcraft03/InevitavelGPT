@@ -1,4 +1,4 @@
-# Roda a cada hora. Twitter só nas horas definidas em TWITTER_UTC_HOURS (padrão: "12,20" = 9h e 17h BRT).
+# Roda a cada hora. Twitter só nas horas definidas em TWITTER_UTC_HOURS (padrão: "15,18,21" = 12h, 15h e 18h BRT).
 [deploy]
 cronSchedule = "0 * * * *"
 startCommand = "python main.py"
