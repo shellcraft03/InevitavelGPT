@@ -245,7 +245,7 @@ export default function BotXTwitterAccount() {
               <section style={s.card}>
                 <h2 style={s.sectionTitle}>Como funciona</h2>
                 <p style={s.bodyText}>
-                  Mencione @Inevitavel_Bot com a palavra "InevitávelGPT" e os termos "Livro Amarelo"
+                  Mencione @Inevitavel_Bot com a palavra "GPT" e os termos "Livro Amarelo"
                   ou "Renan Santos". O bot detecta a menção e publica a resposta pelo perfil
                   @Inevitavel_Bot. Cada resposta consome {formatReais(tweetCostCents)} do saldo disponível.
                 </p>
