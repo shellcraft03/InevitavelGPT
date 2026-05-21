@@ -12,29 +12,35 @@ function PullIndicator({ pullY, refreshing, threshold }) {
 
   return (
     <div style={{
-      position:        'fixed',
-      top:             refreshing ? 16 : Math.max(pullY - 40, 4),
-      left:            '50%',
-      transform:       'translateX(-50%)',
-      zIndex:          9999,
-      background:      '#FCBF22',
-      borderRadius:    '999px',
-      width:           36,
-      height:          36,
-      display:         'flex',
-      alignItems:      'center',
-      justifyContent:  'center',
-      boxShadow:       '0 2px 8px rgba(0,0,0,0.18)',
-      opacity:         refreshing ? 1 : 0.4 + progress * 0.6,
-      transition:      refreshing ? 'top 0.2s' : 'none',
-      pointerEvents:   'none',
+      position:       'fixed',
+      top:            refreshing ? 16 : Math.max(pullY - 40, 4),
+      left:           '50%',
+      transform:      'translateX(-50%)',
+      zIndex:         9999,
+      background:     '#FCBF22',
+      borderRadius:   '999px',
+      width:          36,
+      height:         36,
+      display:        'flex',
+      alignItems:     'center',
+      justifyContent: 'center',
+      boxShadow:      '0 2px 8px rgba(0,0,0,0.18)',
+      opacity:        refreshing ? 1 : 0.4 + progress * 0.6,
+      transition:     refreshing ? 'top 0.2s' : 'none',
+      pointerEvents:  'none',
     }}>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-        style={{ animation: refreshing ? 'ptr-spin 0.7s linear infinite' : 'none',
-                 transform: refreshing ? 'none' : `rotate(${progress * 180}deg)` }}>
-        <path d="M12 4v4m0 0l-3-3m3 3l3-3M4 12a8 8 0 0116 0" stroke="#000" strokeWidth="2.2"
-          strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
+      {refreshing ? (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+          style={{ animation: 'ptr-spin 0.7s linear infinite' }}>
+          <path d="M21 12a9 9 0 1 1-6.22-8.56" stroke="#000" strokeWidth="2.5" strokeLinecap="round"/>
+        </svg>
+      ) : (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+          style={{ transform: `rotate(${progress * 180}deg)`, transition: 'transform 0.05s' }}>
+          <line x1="12" y1="4" x2="12" y2="18" stroke="#000" strokeWidth="2.5" strokeLinecap="round"/>
+          <polyline points="6,12 12,19 18,12" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
       <style>{`@keyframes ptr-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
