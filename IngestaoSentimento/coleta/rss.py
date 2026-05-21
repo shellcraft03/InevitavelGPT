@@ -36,7 +36,8 @@ def _google_news_url(termos):
 
 def _fetch_feed(url, label):
     """Fetches a Google News RSS feed and returns today's allowed articles."""
-    today = datetime.date.today()
+    BRT = datetime.timezone(datetime.timedelta(hours=-3))
+    today = datetime.datetime.now(BRT).date()
     articles = []
     try:
         feed = feedparser.parse(url)

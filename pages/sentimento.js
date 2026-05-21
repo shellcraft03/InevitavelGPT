@@ -221,8 +221,7 @@ export default function Sentimento() {
 
                       {row?.data && (
                         <div style={s.dateLabel}>
-                          {new Date(row.data).toLocaleDateString('pt-BR',
-                            { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          {row.data.split('-').reverse().join('/')}
                         </div>
                       )}
                     </div>
@@ -255,8 +254,7 @@ export default function Sentimento() {
                           ) : dates.map((date, i) => (
                             <tr key={date} style={i % 2 === 0 ? s.trEven : s.trOdd}>
                               <td style={s.td}>
-                                {new Date(date).toLocaleDateString('pt-BR',
-                                  { timeZone: 'UTC', day: '2-digit', month: '2-digit' })}
+                                {date.split('-').slice(1).reverse().join('/')}
                               </td>
                               {candidatos.map(c => {
                                 const row = recentRows(c.slug).find(r => r.data === date);

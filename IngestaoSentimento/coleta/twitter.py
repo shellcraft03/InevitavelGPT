@@ -6,6 +6,8 @@ from coleta.config import CANDIDATES
 
 log = logging.getLogger(__name__)
 
+_SEARCH_URL = "https://api.twitter.com/2/tweets/search/recent"
+
 
 def _auth():
     return OAuth1(
@@ -16,8 +18,13 @@ def _auth():
     )
 
 
-def fetch_twitter(cursors=None):
-    """Returns (dict: slug -> list of tweet texts, dict: slug -> new since_id)."""
+def fetch_twitter(cursors=None, max_results=None):
+    """Returns (dict: slug -> list of {tweet_id, texto}, dict: slug -> new since_id).
+
+    max_results overrides TWITTER_MAX_RESULTS env var when provided.
+    When no cursor exists for a candidate, fetches the most recent tweets
+    up to max_results (useful for seeding after a full reprocess).
+    """
     cursors = cursors or {}
     result = {c["slug"]: [] for c in CANDIDATES}
     new_cursors = {}
@@ -25,22 +32,17 @@ def fetch_twitter(cursors=None):
 
     for candidate in CANDIDATES:
         try:
-            max_results = int(os.environ.get("TWITTER_MAX_RESULTS", "10"))
+            n = max_results or int(os.environ.get("TWITTER_MAX_RESULTS", "10"))
             params = {
-                "query": candidate["twitter_query"],
-                "max_results": max_results,
+                "query":        candidate["twitter_query"],
+                "max_results":  n,
                 "tweet.fields": "text",
             }
             since_id = cursors.get(candidate["slug"])
             if since_id:
                 params["since_id"] = since_id
 
-            resp = requests.get(
-                "https://api.twitter.com/2/tweets/search/recent",
-                auth=auth,
-                params=params,
-                timeout=15,
-            )
+            resp = requests.get(_SEARCH_URL, auth=auth, params=params, timeout=15)
             if resp.status_code == 429:
                 log.warning("Twitter rate limited, stopping")
                 break
@@ -52,7 +54,7 @@ def fetch_twitter(cursors=None):
             result[candidate["slug"]] = [{"tweet_id": t["id"], "texto": t["text"]} for t in data]
             if data:
                 new_cursors[candidate["slug"]] = data[0]["id"]
-            log.info(f"Twitter {candidate['slug']}: {len(data)} tweets novos")
+            log.info(f"Twitter {candidate['slug']}: {len(data)} tweets coletados")
         except Exception as e:
             log.warning(f"Twitter {candidate['slug']}: {e}")
 
