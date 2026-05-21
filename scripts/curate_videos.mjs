@@ -73,6 +73,20 @@ function extractChannelNameFromHtml(html) {
   return null;
 }
 
+async function fetchChannelFromOembed(videoId) {
+  try {
+    const url = new URL('https://www.youtube.com/oembed');
+    url.searchParams.set('url', `https://www.youtube.com/watch?v=${videoId}`);
+    url.searchParams.set('format', 'json');
+    const res = await fetch(url.toString());
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.author_name || null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchVideoChannelName(videoId) {
   const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
     headers: {
@@ -81,7 +95,7 @@ async function fetchVideoChannelName(videoId) {
     },
   });
   if (!res.ok) throw new Error(`YouTube respondeu HTTP ${res.status}`);
-  return extractChannelNameFromHtml(await res.text());
+  return extractChannelNameFromHtml(await res.text()) || await fetchChannelFromOembed(videoId);
 }
 
 async function rejectVideo(id, reason) {
@@ -138,9 +152,11 @@ async function curate(video) {
   let channel;
   try {
     channel = await fetchVideoChannelName(videoId);
-  } catch (err) {
-    console.warn(`[${id}] Nao foi possivel validar o canal do YouTube, sera tentado novamente: ${err.message}`);
-    return;
+  } catch {
+    channel = null;
+  }
+  if (!channel) {
+    channel = await fetchChannelFromOembed(videoId);
   }
   if (!channel) {
     console.warn(`[${id}] Nome do canal indisponivel, sera tentado novamente.`);
