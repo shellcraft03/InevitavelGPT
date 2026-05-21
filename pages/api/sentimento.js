@@ -18,7 +18,12 @@ export default async function handler(req, res) {
         SELECT slug, nome, partido
         FROM eleicoes_candidatos
         WHERE ativo = TRUE
-        ORDER BY slug
+        ORDER BY CASE slug
+          WHEN 'renan-santos'     THEN 1
+          WHEN 'flavio-bolsonaro' THEN 2
+          WHEN 'lula'             THEN 3
+          ELSE 4
+        END
       `,
       sql`
         SELECT candidato_slug, fonte, data::text, positivo, neutro, negativo,
