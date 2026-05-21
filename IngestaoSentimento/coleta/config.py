@@ -3,7 +3,7 @@ ALLOWED_RSS_SOURCES = {
     "cnn", "agencia brasil", "metropoles", "correio braziliense",
     "poder360", "jovem pan", "gazeta do povo", "veja", "exame",
     "istoe", "r7", "band", "crusoe", "antagonista", "infomoney",
-    "mynews", "my news"
+    "mynews", "my news", "brado", "oeste"
 }
 
 CANDIDATES = [

@@ -184,6 +184,13 @@ export default function Sentimento() {
 
           {!loading && !error && (
             <>
+              {!isPolymarket && (
+                <div style={{ display: 'flex', gap: 16, fontSize: '0.75rem' }}>
+                  <span style={{ color: '#22c55e' }}>▲ Menções positivas</span>
+                  <span style={{ color: dark ? '#777' : '#6b7280' }}>● Menções neutras</span>
+                  <span style={{ color: '#ef4444' }}>▼ Menções negativas</span>
+                </div>
+              )}
               <div style={s.grid}>
                 {candidatos.map(c => {
                   const row = latestRow(c.slug);
@@ -216,6 +223,11 @@ export default function Sentimento() {
                           <SentimentBar positivo={row?.positivo ?? null}
                             neutro={row?.neutro ?? null}
                             negativo={row?.negativo ?? null} dark={dark} />
+                          {fonte === 'rss' && row?.volume != null && (
+                            <div style={{ fontSize: '0.7rem', color: dark ? '#666' : '#999' }}>
+                              {row.volume} {row.volume === 1 ? 'notícia analisada' : 'notícias analisadas'}
+                            </div>
+                          )}
                         </>
                       )}
 
@@ -241,7 +253,7 @@ export default function Sentimento() {
                         <thead>
                           <tr>
                             <th style={s.th}>Data</th>
-                            {candidatos.map(c => <th key={c.slug} style={s.th}>{c.nome}</th>)}
+                            {candidatos.map(c => <th key={c.slug} style={s.th}>{c.nome.split(' ')[0]}</th>)}
                           </tr>
                         </thead>
                         <tbody>
