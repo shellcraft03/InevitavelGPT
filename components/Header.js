@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+
+const useClientLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 // Adicionar novas páginas aqui — o nav atualiza automaticamente
 const PAGES = [
@@ -60,12 +62,20 @@ export default function Header({ currentPage, dark, toggleDark, onCurrentPageCli
   const [isMobile, setIsMobile] = useState(false);
   const router = useRouter();
 
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 640);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
+  useClientLayoutEffect(() => {
+    const mql = window.matchMedia('(max-width: 639px)');
+    setIsMobile(mql.matches);
+    const handler = e => setIsMobile(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
   }, []);
+
+  useEffect(() => {
+    if (!isMobile && menuOpen) {
+      setMenuOpen(false);
+      document.body.style.overflow = '';
+    }
+  }, [isMobile, menuOpen]);
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? 'hidden' : '';
