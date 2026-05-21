@@ -185,6 +185,20 @@ def curate(conn, video, segments):
 
 # ── Indexing ──────────────────────────────────────────────────────────────────
 
+def fetch_channel_from_oembed(video_id):
+    try:
+        res = requests.get(
+            'https://www.youtube.com/oembed',
+            params={'url': f'https://www.youtube.com/watch?v={video_id}', 'format': 'json'},
+            timeout=10,
+        )
+        if res.ok:
+            return res.json().get('author_name') or None
+    except Exception:
+        pass
+    return None
+
+
 def fetch_video_metadata(video_id):
     try:
         headers = {'Accept-Language': 'pt-BR,pt;q=0.9', 'User-Agent': 'Mozilla/5.0'}
@@ -193,13 +207,14 @@ def fetch_video_metadata(video_id):
         m_date    = re.search(r'"publishDate"\s*:\s*"([^"]+)"', html) or re.search(r'"uploadDate"\s*:\s*"([^"]+)"', html)
         m_title   = re.search(r'"title"\s*:\s*\{"runs"\s*:\s*\[\{"text"\s*:\s*"([^"]+)"', html)
         m_channel = re.search(r'"ownerChannelName"\s*:\s*"([^"]+)"', html)
+        channel   = (m_channel.group(1) if m_channel else None) or fetch_channel_from_oembed(video_id)
         return {
             'published_at': m_date.group(1).split('T')[0] if m_date else None,
             'title':        m_title.group(1) if m_title else None,
-            'channel':      m_channel.group(1) if m_channel else None,
+            'channel':      channel,
         }
     except Exception:
-        return {'published_at': None, 'title': None, 'channel': None}
+        return {'published_at': None, 'title': None, 'channel': fetch_channel_from_oembed(video_id)}
 
 
 def chunk_segments(segments, max_chars=CHUNK_SIZE):
@@ -393,8 +408,14 @@ def main():
                 continue
             channel = meta.get('channel')
             if not channel:
-                print(f'[{vid_id}] Nome do canal indisponivel, sera tentado novamente.')
-                continue
+                fallback = fetch_video_metadata(video_id)
+                channel = fallback.get('channel')
+                if channel:
+                    meta = {**meta, 'channel': channel}
+                    print(f'[{vid_id}] Canal via fallback: {channel}')
+                else:
+                    print(f'[{vid_id}] Nome do canal indisponivel, sera tentado novamente.')
+                    continue
             blocked_term = find_blocked_channel_term(channel)
             if blocked_term:
                 reject_video(conn, vid_id, f'Canal bloqueado ({channel})')
