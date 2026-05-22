@@ -194,7 +194,6 @@ def insert_noticias(conn, date, articles):
                                relevante  = EXCLUDED.relevante""",
                     (noticia_id, slug, sentimento, relevante),
                 )
-    conn.commit()
 
 
 def compute_rss_sentiment(conn, date):
@@ -229,7 +228,6 @@ def insert_tweets(conn, date, slug, tweets):
                 ON CONFLICT (tweet_id, candidato_slug) DO UPDATE SET
                     sentimento = EXCLUDED.sentimento
             """, (t['tweet_id'], slug, date, t['texto'][:1000], t['sentimento']))
-    conn.commit()
 
 
 def compute_twitter_sentiment(conn, date):
@@ -268,7 +266,6 @@ def save_twitter_cursor(conn, slug, since_id):
                 since_id      = EXCLUDED.since_id,
                 atualizado_em = NOW()
         """, (slug, since_id))
-    conn.commit()
 
 
 def upsert_sentiment(conn, slug, fonte, date, pos, neu, neg, vol,
@@ -323,4 +320,3 @@ def upsert_sentiment(conn, slug, fonte, date, pos, neu, neg, vol,
                     atualizado_em   = NOW()
             """, (slug, fonte, date, pct_pos, pct_neu, pct_neg,
                   vol if total else None, pos, neu, neg, score_tendencia, odds))
-    conn.commit()
