@@ -13,7 +13,7 @@ const rl = createInterface({ input: process.stdin, output: process.stdout });
 
 async function listPending() {
   const rows = await sql`
-    SELECT id, url, title, individual, created_at
+    SELECT id, url, title, channel, published_at, individual
     FROM videos WHERE curated IS NULL ORDER BY created_at
   `;
 
@@ -24,17 +24,17 @@ async function listPending() {
 
   console.log(`\n${rows.length} vídeo(s) pendentes:\n`);
   for (const v of rows) {
-    console.log(`  ID ${v.id} — ${v.url}`);
-    if (v.title)      console.log(`          Título: ${v.title}`);
+    const date    = v.published_at ? String(v.published_at).slice(0, 10) : 'sem data';
+    const channel = v.channel || 'sem canal';
+    const title   = v.title   || 'sem título';
+    console.log(`  [${v.id}] [pendente] ${date} | ${channel} | ${title} | ${v.url}`);
     if (v.individual) console.log(`          Entrevistado: ${v.individual}`);
-    console.log(`          Enviado: ${new Date(v.created_at).toLocaleString('pt-BR')}`);
-    console.log('');
   }
 }
 
 async function listAll() {
   const rows = await sql`
-    SELECT id, url, title, curated, indexed, rejection_reason, created_at
+    SELECT id, url, title, channel, published_at, curated, indexed, rejection_reason
     FROM videos ORDER BY created_at DESC
   `;
 
@@ -43,23 +43,24 @@ async function listAll() {
     return;
   }
 
-  const status = v =>
-    v.curated === null  ? 'Pendente'          :
-    v.curated === true  ? (v.indexed ? 'Aprovado + Indexado' : 'Aprovado') :
-                          'Reprovado';
+  const label = v =>
+    v.curated === null ? 'pendente'         :
+    v.curated          ? (v.indexed ? 'aprovado/indexado' : 'aprovado') :
+                         'reprovado';
 
   console.log(`\n${rows.length} vídeo(s) no total:\n`);
   for (const v of rows) {
-    console.log(`  ID ${v.id} [${status(v)}] — ${v.url}`);
-    if (v.title)            console.log(`          Título: ${v.title}`);
+    const date    = v.published_at ? String(v.published_at).slice(0, 10) : 'sem data';
+    const channel = v.channel || 'sem canal';
+    const title   = v.title   || 'sem título';
+    console.log(`  [${v.id}] [${label(v)}] ${date} | ${channel} | ${title} | ${v.url}`);
     if (v.rejection_reason) console.log(`          Motivo: ${v.rejection_reason}`);
-    console.log('');
   }
 }
 
 async function manualCurate() {
   const rows = await sql`
-    SELECT id, url, title, individual, created_at
+    SELECT id, url, title, channel, published_at, individual
     FROM videos WHERE curated IS NULL ORDER BY created_at
   `;
 
@@ -71,8 +72,10 @@ async function manualCurate() {
 
   console.log(`\n${rows.length} vídeo(s) pendentes:\n`);
   for (const v of rows) {
-    const extra = v.title ? ` — ${v.title}` : '';
-    console.log(`  [${v.id}] ${v.url}${extra}`);
+    const date    = v.published_at ? String(v.published_at).slice(0, 10) : 'sem data';
+    const channel = v.channel || 'sem canal';
+    const title   = v.title   || 'sem título';
+    console.log(`  [${v.id}] [pendente] ${date} | ${channel} | ${title} | ${v.url}`);
   }
 
   const idStr = await rl.question('\nID do vídeo (Enter para cancelar): ');
@@ -118,7 +121,7 @@ async function manualCurate() {
 
 async function rejectCurated() {
   const rows = await sql`
-    SELECT id, url, title, indexed, curated_at
+    SELECT id, url, title, channel, published_at, indexed
     FROM videos WHERE curated = true ORDER BY curated_at
   `;
 
@@ -130,9 +133,10 @@ async function rejectCurated() {
 
   console.log(`\n${rows.length} vídeo(s) aprovados:\n`);
   for (const v of rows) {
-    const flag  = v.indexed ? ' [indexado]' : ' [não indexado]';
-    const extra = v.title ? ` — ${v.title}` : '';
-    console.log(`  [${v.id}]${flag} ${v.url}${extra}`);
+    const date    = v.published_at ? String(v.published_at).slice(0, 10) : 'sem data';
+    const channel = v.channel || 'sem canal';
+    const title   = v.title   || 'sem título';
+    console.log(`  [${v.id}] [aprovado${v.indexed ? '/indexado' : ''}] ${date} | ${channel} | ${title} | ${v.url}`);
   }
 
   const idStr = await rl.question('\nID do vídeo para reprovar (Enter para cancelar): ');
