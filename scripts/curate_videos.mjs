@@ -1,7 +1,6 @@
 import { neon } from '@neondatabase/serverless';
-import { YoutubeTranscript } from 'youtube-transcript';
+import { spawnSync } from 'node:child_process';
 import OpenAI from 'openai';
-import { loadCached, saveCache } from './lib/transcript_cache.mjs';
 
 try { await import('dotenv').then(d => d.config({ path: '.env.local' })); } catch (e) {}
 
@@ -109,26 +108,18 @@ async function rejectVideo(id, reason) {
   console.log(`[${id}] Reprovado: ${reason}\n`);
 }
 
-async function fetchTranscript(url, videoId) {
-  if (videoId) {
-    const cached = await loadCached(videoId);
-    if (cached) {
-      const full = cached.map(s => s.text).join(' ');
-      return { full, totalChars: full.length };
-    }
+function fetchTranscriptPy(videoId) {
+  const result = spawnSync('py', ['scripts/fetch_transcript.py', videoId], {
+    encoding: 'utf8',
+    timeout: 90000,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    throw new Error((result.stderr || '').trim() || 'fetch_transcript.py falhou');
   }
-
-  let segments;
-  try {
-    segments = await YoutubeTranscript.fetchTranscript(url, { lang: 'pt' });
-  } catch {
-    segments = await YoutubeTranscript.fetchTranscript(url);
-  }
-
-  if (videoId) await saveCache(videoId, segments);
-
-  const full = segments.map(s => s.text).join(' ');
-  return { full, totalChars: full.length };
+  const data = JSON.parse(result.stdout);
+  if (data.error) throw new Error(data.error);
+  return data.segments;
 }
 
 function sanitizeField(value, maxLen = 200) {
@@ -166,13 +157,15 @@ async function curate(video) {
   }
   console.log(`[${id}] Canal: ${channel}`);
 
-  let full, totalChars;
+  let segments;
   try {
-    ({ full, totalChars } = await fetchTranscript(url, videoId));
+    segments = fetchTranscriptPy(videoId);
   } catch (err) {
     console.warn(`[${id}] Não foi possível obter transcrição, pulando (será tentado novamente): ${err.message}`);
     return;
   }
+  const full = segments.map(s => s.text).join(' ');
+  const totalChars = full.length;
 
   const userMessage = [
     title       ? `Título informado: ${title}` : null,
