@@ -76,6 +76,7 @@ export default function Doacoes() {
                 <li>Cada real doado é convertido em créditos para fazer uma pergunta</li>
                 <li>Créditos liberados automaticamente após o Pix</li>
                 <li>Créditos são um bônus — não uma compra de serviço</li>
+                <li>Saldo acima de R$&nbsp;10,00 em céditos remove o banner de apoio do site</li>
               </ul>
               <a href="/inevitavelgpt2" style={s.btnPrimary}>
                 Acessar página do Bot X/Twitter

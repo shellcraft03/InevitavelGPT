@@ -169,7 +169,7 @@ async function rejectCurated() {
 
 async function resetVideo() {
   const rows = await sql`
-    SELECT id, url, title, curated, indexed
+    SELECT id, url, title, channel, published_at, curated, indexed
     FROM videos ORDER BY created_at DESC
   `;
 
@@ -185,8 +185,10 @@ async function resetVideo() {
 
   console.log(`\n${rows.length} vídeo(s):\n`);
   for (const v of rows) {
-    const extra = v.title ? ` — ${v.title}` : '';
-    console.log(`  [${v.id}] [${label(v)}${v.indexed ? '/indexado' : ''}] ${v.url}${extra}`);
+    const date    = v.published_at ? String(v.published_at).slice(0, 10) : 'sem data';
+    const channel = v.channel || 'sem canal';
+    const title   = v.title   || 'sem título';
+    console.log(`  [${v.id}] [${label(v)}${v.indexed ? '/indexado' : ''}] ${date} | ${channel} | ${title} | ${v.url}`);
   }
 
   const idStr = await rl.question('\nID do vídeo para resetar (Enter para cancelar): ');
@@ -270,7 +272,7 @@ async function resetCurationAll() {
 
 async function resetCurationVideo() {
   const rows = await sql`
-    SELECT id, url, title, curated, indexed
+    SELECT id, url, title, channel, published_at, curated, indexed
     FROM videos ORDER BY created_at DESC
   `;
 
@@ -286,8 +288,10 @@ async function resetCurationVideo() {
 
   console.log(`\n${rows.length} vídeo(s):\n`);
   for (const v of rows) {
-    const extra = v.title ? ` — ${v.title}` : '';
-    console.log(`  [${v.id}] [${label(v)}${v.indexed ? '/indexado' : ''}] ${v.url}${extra}`);
+    const date    = v.published_at ? String(v.published_at).slice(0, 10) : 'sem data';
+    const channel = v.channel || 'sem canal';
+    const title   = v.title   || 'sem título';
+    console.log(`  [${v.id}] [${label(v)}${v.indexed ? '/indexado' : ''}] ${date} | ${channel} | ${title} | ${v.url}`);
   }
 
   const idStr = await rl.question('\nID do vídeo para resetar curadoria (Enter para cancelar): ');

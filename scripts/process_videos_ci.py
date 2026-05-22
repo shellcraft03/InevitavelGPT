@@ -122,7 +122,12 @@ def fetch_transcript_data(video_id):
     transcript = transcript_list.find_transcript(['pt-BR', 'pt', 'pt-PT', 'en'])
     snippets = transcript.fetch()
     segments = [{'text': s.text, 'offset_ms': int(s.start * 1000)} for s in snippets]
-    return segments, extract_video_metadata_from_innertube(innertube_data)
+    meta = extract_video_metadata_from_innertube(innertube_data)
+    # Android InnerTube context omits microformat, so publishDate is absent; fall back to HTML
+    if not meta['published_at']:
+        m = re.search(r'"publishDate"\s*:\s*"([^"]+)"', html) or re.search(r'"uploadDate"\s*:\s*"([^"]+)"', html)
+        meta['published_at'] = m.group(1).split('T')[0] if m else None
+    return segments, meta
 
 
 def reject_video(conn, vid_id, reason):
