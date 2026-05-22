@@ -149,7 +149,9 @@ describe('llmRerankChunks', () => {
         },
       },
     };
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const result = await llmRerankChunks(mockClient, 'q', candidates, baseOpts);
+    warnSpy.mockRestore();
     expect(result.length).toBe(3);
   });
 
