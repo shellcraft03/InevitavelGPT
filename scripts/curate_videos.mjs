@@ -1,7 +1,6 @@
 import { neon } from '@neondatabase/serverless';
-import { YoutubeTranscript } from 'youtube-transcript';
+import { spawnSync } from 'node:child_process';
 import OpenAI from 'openai';
-import { loadCached, saveCache } from './lib/transcript_cache.mjs';
 
 try { await import('dotenv').then(d => d.config({ path: '.env.local' })); } catch (e) {}
 
@@ -9,46 +8,85 @@ const sql    = neon(process.env.DATABASE_URL);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT_CURADORIA;
-const BLOCKED_YOUTUBE_CHANNEL_HANDLES = parseBlockedHandles(process.env.BLOCKED_YOUTUBE_CHANNEL_HANDLES);
+const BLOCKED_YOUTUBE_CHANNEL_NAMES = parseBlockedChannelNames(process.env.BLOCKED_YOUTUBE_CHANNEL_NAMES);
 
 function extractVideoId(url) {
   const m = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
   return m ? m[1] : null;
 }
 
-function normalizeHandle(handle) {
-  if (!handle || typeof handle !== 'string') return null;
-  const trimmed = handle.trim().replace(/^https?:\/\/(www\.)?youtube\.com\//i, '');
-  const withAt = trimmed.startsWith('@') ? trimmed : `@${trimmed}`;
-  return withAt.toLowerCase();
+function normalizeChannelName(name) {
+  if (!name || typeof name !== 'string') return null;
+  return name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 }
 
-function parseBlockedHandles(value) {
+function parseBlockedChannelNames(value) {
   if (!value || typeof value !== 'string') return new Set();
   return new Set(
     value
-      .split(/[\n,;]/)
-      .map(normalizeHandle)
+      .split(';')
+      .map(normalizeChannelName)
       .filter(Boolean),
   );
 }
 
-function extractChannelHandleFromHtml(html) {
-  const patterns = [
-    /"canonicalBaseUrl"\s*:\s*"\/(@[^"]+)"/,
-    /"ownerProfileUrl"\s*:\s*"https?:\/\/www\.youtube\.com\/(@[^"]+)"/,
-    /"webCommandMetadata"\s*:\s*\{[^}]*"url"\s*:\s*"\/(@[^"]+)"/,
-    /href="\/(@[^"]+)"/,
-  ];
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
-  for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (match) return normalizeHandle(match[1]);
+function findBlockedChannelTerm(channelName) {
+  const normalizedChannel = normalizeChannelName(channelName);
+  if (!normalizedChannel) return null;
+  for (const term of BLOCKED_YOUTUBE_CHANNEL_NAMES) {
+    if (new RegExp(`(?<!\\w)${escapeRegExp(term)}(?!\\w)`).test(normalizedChannel)) {
+      return term;
+    }
   }
   return null;
 }
 
-async function fetchVideoChannelHandle(videoId) {
+function decodeJsonString(value) {
+  try {
+    return JSON.parse(`"${value}"`);
+  } catch {
+    return value;
+  }
+}
+
+function extractChannelNameFromHtml(html) {
+  const patterns = [
+    /"ownerChannelName"\s*:\s*"([^"]+)"/,
+    /"ownerChannelName"\s*:\s*\{"simpleText"\s*:\s*"([^"]+)"/,
+    /"author"\s*:\s*"([^"]+)"/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match) return sanitizeField(decodeJsonString(match[1]), 200);
+  }
+  return null;
+}
+
+async function fetchChannelFromOembed(videoId) {
+  try {
+    const url = new URL('https://www.youtube.com/oembed');
+    url.searchParams.set('url', `https://www.youtube.com/watch?v=${videoId}`);
+    url.searchParams.set('format', 'json');
+    const res = await fetch(url.toString());
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.author_name || null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchVideoChannelName(videoId) {
   const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
     headers: {
       'Accept-Language': 'pt-BR,pt;q=0.9',
@@ -56,7 +94,7 @@ async function fetchVideoChannelHandle(videoId) {
     },
   });
   if (!res.ok) throw new Error(`YouTube respondeu HTTP ${res.status}`);
-  return extractChannelHandleFromHtml(await res.text());
+  return extractChannelNameFromHtml(await res.text()) || await fetchChannelFromOembed(videoId);
 }
 
 async function rejectVideo(id, reason) {
@@ -70,26 +108,18 @@ async function rejectVideo(id, reason) {
   console.log(`[${id}] Reprovado: ${reason}\n`);
 }
 
-async function fetchTranscript(url, videoId) {
-  if (videoId) {
-    const cached = await loadCached(videoId);
-    if (cached) {
-      const full = cached.map(s => s.text).join(' ');
-      return { full, totalChars: full.length };
-    }
+function fetchTranscriptPy(videoId) {
+  const result = spawnSync('py', ['scripts/fetch_transcript.py', videoId], {
+    encoding: 'utf8',
+    timeout: 90000,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    throw new Error((result.stderr || '').trim() || 'fetch_transcript.py falhou');
   }
-
-  let segments;
-  try {
-    segments = await YoutubeTranscript.fetchTranscript(url, { lang: 'pt' });
-  } catch {
-    segments = await YoutubeTranscript.fetchTranscript(url);
-  }
-
-  if (videoId) await saveCache(videoId, segments);
-
-  const full = segments.map(s => s.text).join(' ');
-  return { full, totalChars: full.length };
+  const data = JSON.parse(result.stdout);
+  if (data.error) throw new Error(data.error);
+  return data.segments;
 }
 
 function sanitizeField(value, maxLen = 200) {
@@ -110,25 +140,32 @@ async function curate(video) {
     return;
   }
 
-  if (BLOCKED_YOUTUBE_CHANNEL_HANDLES.size > 0) {
-    try {
-      const handle = await fetchVideoChannelHandle(videoId);
-      if (handle && BLOCKED_YOUTUBE_CHANNEL_HANDLES.has(handle)) {
-        await rejectVideo(id, `Canal bloqueado (${handle})`);
-        return;
-      }
-    } catch (err) {
-      console.warn(`[${id}] Nao foi possivel validar o canal do YouTube, seguindo com curadoria: ${err.message}`);
-    }
-  }
-
-  let full, totalChars;
+  let channel;
   try {
-    ({ full, totalChars } = await fetchTranscript(url, videoId));
+    channel = await fetchVideoChannelName(videoId);
+  } catch {
+    channel = await fetchChannelFromOembed(videoId);
+  }
+  if (!channel) {
+    console.warn(`[${id}] Nome do canal indisponivel, sera tentado novamente.`);
+    return;
+  }
+  const blockedTerm = findBlockedChannelTerm(channel);
+  if (blockedTerm) {
+    await rejectVideo(id, `Canal bloqueado (${channel})`);
+    return;
+  }
+  console.log(`[${id}] Canal: ${channel}`);
+
+  let segments;
+  try {
+    segments = fetchTranscriptPy(videoId);
   } catch (err) {
     console.warn(`[${id}] Não foi possível obter transcrição, pulando (será tentado novamente): ${err.message}`);
     return;
   }
+  const full = segments.map(s => s.text).join(' ');
+  const totalChars = full.length;
 
   const userMessage = [
     title       ? `Título informado: ${title}` : null,

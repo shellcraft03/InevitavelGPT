@@ -1,18 +1,12 @@
-import { useEffect } from 'react';
 import Head from 'next/head';
-import { useRouter } from 'next/router';
 import { useDarkMode } from '../hooks/useDarkMode';
+import { useSessionGate } from '../hooks/useSessionGate';
 import Header from '../components/Header';
 import ShareBar from '../components/ShareBar';
 
 export default function Sobre() {
   const [dark, toggleDark] = useDarkMode();
-  const router = useRouter();
-
-  useEffect(() => {
-    const token = typeof window !== 'undefined' ? sessionStorage.getItem('turnstileToken') : null;
-    if (!token) router.replace('/');
-  }, [router]);
+  useSessionGate();
 
   const s = getStyles(dark);
 
@@ -62,12 +56,12 @@ export default function Sobre() {
                 href="https://lp.livroamarelo.com/"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={s.linkBtnYellow}
+                style={{ display: 'inline-flex', alignItems: 'center', background: '#000000', borderRadius: '8px', padding: '6px 10px', height: '56px', boxSizing: 'border-box' }}
               >
-                Adquirir o Livro Amarelo
+                <img src="/LogoLivroAmarelo.svg" alt="Adquirir o Livro Amarelo" style={{ height: '44px', width: 'auto' }} />
               </a>
               <a
-                href="https://github.com/EliasBarbosa0/livro-amarelo"
+                href="https://github.com/shellcraft03/livro-amarelo"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={s.linkBtn}
@@ -93,16 +87,15 @@ export default function Sobre() {
 
           <div style={s.initiativeCard}>
             <p style={s.initiativeDesc}>
-              Conheça outra iniciativa de apoiadores independentes da Missão, onde você encontra informações 
+              Conheça outra iniciativa de apoiadores independentes: Caminho da Missão, onde você encontra informações 
               sobre os pré-candidatos por estado, além de notícias, artigos e conteúdos de ativismo.
             </p>
             <a
               href="https://caminhodamissao.com/"
               target="_blank"
               rel="noopener noreferrer"
-              style={s.linkBtnYellow}
             >
-              Caminho da Missão
+              <img src="/LogoCaminho.svg" alt="Caminho da Missão" style={{ height: '56px', width: 'auto' }} />
             </a>
           </div>
 
@@ -176,6 +169,7 @@ function getStyles(dark) {
       display: 'flex',
       gap: '12px',
       flexWrap: 'wrap',
+      alignItems: 'center',
     },
     linkBtnYellow: {
       display: 'inline-flex',
@@ -202,6 +196,8 @@ function getStyles(dark) {
       fontSize: '0.9rem',
       fontWeight: 700,
       textDecoration: 'none',
+      height: '56px',
+      boxSizing: 'border-box',
     },
     initiativeCard: {
       background: cardBg,

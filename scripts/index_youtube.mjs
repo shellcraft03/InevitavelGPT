@@ -1,17 +1,16 @@
 import { neon } from '@neondatabase/serverless';
 import { Pinecone } from '@pinecone-database/pinecone';
-import { YoutubeTranscript } from 'youtube-transcript';
+import { spawnSync } from 'node:child_process';
 import OpenAI from 'openai';
-import { loadCached, saveCache } from './lib/transcript_cache.mjs';
 try { await import('dotenv').then(d => d.config({ path: '.env.local' })); } catch (e) {}
 
 const sql    = neon(process.env.DATABASE_URL);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const pc     = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
-const index  = pc.index(process.env.PINECONE_INDEX_ENTREVISTAS || process.env.PINECONE_INDEX).namespace('entrevistas');
+const index  = pc.index(process.env.PINECONE_INDEX_ENTREVISTAS).namespace('entrevistas');
 
 const EMBEDDING_MODEL = 'text-embedding-3-large';
-const CHUNK_SIZE      = 400;
+const CHUNK_SIZE      = 650;
 const UPSERT_BATCH    = 100;
 
 function chunkSegments(segments, maxChars = CHUNK_SIZE) {
@@ -22,7 +21,13 @@ function chunkSegments(segments, maxChars = CHUNK_SIZE) {
     if (segs.length === 0) return;
     const raw  = segs.map(s => s.text.trim()).filter(Boolean).join(' ').trim();
     const text = raw.replace(/[<>]/g, m => m === '<' ? '&lt;' : '&gt;');
-    if (text.length >= 80) chunks.push({ text, startOffsetMs: segs[0].offset });
+    if (text.length >= 80) {
+      chunks.push({
+        text,
+        startOffsetMs: segs[0].offset,
+        endOffsetMs: segs[segs.length - 1].offset,
+      });
+    }
   }
 
   function splitBuffer() {
@@ -56,7 +61,10 @@ function chunkSegments(segments, maxChars = CHUNK_SIZE) {
   }
 
   flush(buffer);
-  return chunks;
+  return chunks.map((chunk, i) => ({
+    ...chunk,
+    contextText: [chunks[i - 1]?.text, chunk.text, chunks[i + 1]?.text].filter(Boolean).join(' '),
+  }));
 }
 
 function extractVideoId(url) {
@@ -64,43 +72,19 @@ function extractVideoId(url) {
   return m ? m[1] : null;
 }
 
-async function fetchVideoMetadata(videoId) {
-  try {
-    const res  = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
-      headers: { 'Accept-Language': 'pt-BR,pt;q=0.9', 'User-Agent': 'Mozilla/5.0' },
-    });
-    const html = await res.text();
 
-    const mDate  = html.match(/"publishDate"\s*:\s*"([^"]+)"/) || html.match(/"uploadDate"\s*:\s*"([^"]+)"/);
-    const publishedAt = mDate ? mDate[1].split('T')[0] : null;
-
-    const mTitle   = html.match(/"title"\s*:\s*\{"runs"\s*:\s*\[\{"text"\s*:\s*"([^"]+)"/);
-    const title    = mTitle ? mTitle[1] : null;
-
-    const mChannel = html.match(/"ownerChannelName"\s*:\s*"([^"]+)"/);
-    const channel  = mChannel ? mChannel[1] : null;
-
-    return { publishedAt, title, channel };
-  } catch {
-    return { publishedAt: null, title: null };
+function fetchTranscriptPy(videoId) {
+  const result = spawnSync('py', ['scripts/fetch_transcript.py', videoId], {
+    encoding: 'utf8',
+    timeout: 90000,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    throw new Error((result.stderr || '').trim() || 'fetch_transcript.py falhou');
   }
-}
-
-async function fetchTranscript(url, videoId) {
-  if (videoId) {
-    const cached = await loadCached(videoId);
-    if (cached) return cached;
-  }
-
-  let segments;
-  try {
-    segments = await YoutubeTranscript.fetchTranscript(url, { lang: 'pt' });
-  } catch {
-    segments = await YoutubeTranscript.fetchTranscript(url);
-  }
-
-  if (videoId) await saveCache(videoId, segments);
-  return segments;
+  const data = JSON.parse(result.stdout);
+  if (data.error) throw new Error(data.error);
+  return { segments: data.segments, meta: data.meta };
 }
 
 async function embedBatch(texts) {
@@ -165,14 +149,15 @@ async function indexVideo(video) {
     return false;
   }
 
-  console.log(`[${id}] Buscando metadados e transcrição: ${url}`);
-  const { publishedAt, title: ytTitle, channel } = await fetchVideoMetadata(videoId);
+  console.log(`[${id}] Buscando transcrição e metadados: ${url}`);
+  const { segments: allSegments, meta } = fetchTranscriptPy(videoId);
+  const publishedAt = meta.published_at || null;
+  const ytTitle     = meta.title        || null;
+  const channel     = meta.channel      || null;
   const title = ytTitle || video.title || '';
   if (publishedAt) console.log(`[${id}] Data de publicação: ${publishedAt}`);
   if (ytTitle)     console.log(`[${id}] Título do YouTube: ${ytTitle}`);
   if (channel)     console.log(`[${id}] Canal: ${channel}`);
-
-  const allSegments = await fetchTranscript(url, videoId);
   console.log(`[${id}] ${allSegments.length} segmentos — filtrando falas de ${individual || 'Renan Santos'}...`);
 
   const segments = await filterSpeakerSegments(allSegments, individual);
@@ -194,11 +179,13 @@ async function indexVideo(video) {
 
     const batchRecords = batch.map((chunk, j) => {
       const startSeconds = Math.floor(chunk.startOffsetMs / 1000);
+      const endSeconds = Math.floor((chunk.endOffsetMs || chunk.startOffsetMs) / 1000);
       return {
         id:     `yt-${videoId}-c${i + j}`,
         values: embeddings[j],
         metadata: {
           text:          chunk.text,
+          context_text:  chunk.contextText,
           source:        'youtube',
           video_id:      videoId,
           url,
@@ -209,6 +196,7 @@ async function indexVideo(video) {
           published_at:  publishedAt || '',
           chunk:         i + j,
           start_seconds: startSeconds,
+          end_seconds:   endSeconds,
         },
       };
     });

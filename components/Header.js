@@ -1,14 +1,18 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 
-// Adicionar novas páginas aqui — o dropdown atualiza automaticamente
+const useClientLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
+// Adicionar novas páginas aqui — o nav atualiza automaticamente
 const PAGES = [
-  { href: '/inicio',                  label: 'Início'                  },
-  { href: '/renan-santos-responde',   label: 'Renan Responde'          },
-  { href: '/deputados',               label: 'Deputados'               },
-  { href: '/filiados',                label: 'Filiados'                },
-  { href: '/sobre',                   label: 'Sobre'                   },
-  { href: '/privacidade',             label: 'Privacidade'             },
+  { href: '/inicio',                  label: 'O Plano'        },
+  { href: '/renan-santos-responde',   label: 'Renan Responde' },
+  { href: '/sentimento',              label: 'Eleições 2026'  },
+  { href: '/inevitavelgpt2',          label: 'Bot X/Twitter'  },
+  { href: '/doacoes',                 label: 'Apoie'          },
+  { href: '/sobre',                   label: 'Sobre'          },
+  { href: '/privacidade',             label: 'Privacidade'    },
 ];
 
 function SunIcon() {
@@ -35,11 +39,21 @@ function MoonIcon() {
   );
 }
 
-function ChevronIcon({ open }) {
+function HamburgerIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-      style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
-      <polyline points="6 9 12 15 18 9"/>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="3" y1="6"  x2="21" y2="6"/>
+      <line x1="3" y1="12" x2="21" y2="12"/>
+      <line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="18" y1="6" x2="6" y2="18"/>
+      <line x1="6" y1="6" x2="18" y2="18"/>
     </svg>
   );
 }
@@ -47,65 +61,123 @@ function ChevronIcon({ open }) {
 export default function Header({ currentPage, dark, toggleDark, onCurrentPageClick }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const menuRef = useRef(null);
+  const router = useRouter();
 
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 480);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
+  useClientLayoutEffect(() => {
+    const mql = window.matchMedia('(max-width: 639px)');
+    setIsMobile(mql.matches);
+    const handler = e => setIsMobile(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
   }, []);
 
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+    if (!isMobile && menuOpen) {
+      setMenuOpen(false);
+      document.body.style.overflow = '';
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isMobile, menuOpen]);
 
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    const reset = () => {
+      setMenuOpen(false);
+      document.body.style.overflow = '';
+    };
+    router.events.on('routeChangeStart', reset);
+    return () => router.events.off('routeChangeStart', reset);
+  }, [router.events]);
   const currentLabel = PAGES.find(p => p.href === `/${currentPage}`)?.label ?? currentPage;
   const s = getStyles(dark, isMobile);
 
   return (
     <header style={s.header}>
       <div style={s.headerInner}>
+        {isMobile && (
+          <div style={s.mobilePageLabel}>{currentLabel}</div>
+        )}
         <a href="/" style={s.headerLogo}>
-          <img src="/fasciculo3.png" alt="" style={s.headerThumb} />
-          <div style={s.headerTextWrap}>
-            <div style={s.headerTitle}>Inevitável GPT</div>
-            {!isMobile && <div style={s.headerSub}>O Futuro é Glorioso</div>}
-          </div>
+          <img src="/Imagem3.png" alt="" style={s.headerThumb} />
+          {!isMobile && (
+            <div style={s.headerTextWrap}>
+              <div style={s.headerTitle}>Inevitável GPT</div>
+              <div style={s.headerSub}>O Futuro é Glorioso</div>
+            </div>
+          )}
         </a>
         <nav style={s.nav}>
           <button onClick={toggleDark} style={s.darkToggle} title={dark ? 'Modo claro' : 'Modo escuro'}>
             {dark ? <SunIcon /> : <MoonIcon />}
           </button>
-          <div ref={menuRef} style={{ position: 'relative' }}>
-            <button onClick={() => setMenuOpen(o => !o)} style={s.navDropdownBtn}>
-              {currentLabel} <ChevronIcon open={menuOpen} />
-            </button>
-            {menuOpen && (
-              <div style={s.navDropdown}>
-                {PAGES.map(page => {
-                  const isActive = page.href === `/${currentPage}`;
-                  return (
-                    <Link
-                      key={page.href}
-                      href={page.href}
-                      style={isActive ? s.navDropdownItemActive : s.navDropdownItem}
-                      onClick={isActive
-                        ? e => { e.preventDefault(); setMenuOpen(false); onCurrentPageClick?.(); }
-                        : () => setMenuOpen(false)
-                      }
-                    >
-                      {page.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          {isMobile ? (
+            <>
+              <button
+                onClick={() => setMenuOpen(o => !o)}
+                style={s.hamburgerBtn}
+                aria-label="Menu de navegação"
+                aria-expanded={menuOpen}
+              >
+                <HamburgerIcon />
+              </button>
+              {menuOpen && (
+                <>
+                  <div style={s.backdrop} onClick={() => setMenuOpen(false)} />
+                  <div style={s.offcanvas}>
+                    <div style={s.offcanvasHeader}>
+                      <a href="/" style={s.offcanvasLogo}>
+                        <img src="/Imagem3.png" alt="" style={s.headerThumb} />
+                        <div>
+                          <div style={s.offcanvasTitle}>Inevitável GPT</div>
+                          <div style={s.offcanvasSub}>O Futuro é Glorioso</div>
+                        </div>
+                      </a>
+                      <button onClick={() => setMenuOpen(false)} style={s.closeBtn} aria-label="Fechar menu">
+                        <CloseIcon />
+                      </button>
+                    </div>
+                    <nav>
+                      {PAGES.map(page => {
+                        const isActive = page.href === `/${currentPage}`;
+                        return (
+                          <Link
+                            key={page.href}
+                            href={page.href}
+                            style={isActive ? s.offcanvasLinkActive : s.offcanvasLink}
+                            onClick={isActive && router.pathname === page.href
+                              ? e => { e.preventDefault(); setMenuOpen(false); onCurrentPageClick?.(); }
+                              : () => setMenuOpen(false)
+                            }
+                          >
+                            {page.label}
+                          </Link>
+                        );
+                      })}
+                    </nav>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <div style={s.desktopLinks}>
+              {PAGES.map(page => {
+                const isActive = page.href === `/${currentPage}`;
+                return (
+                  <Link
+                    key={page.href}
+                    href={page.href}
+                    style={isActive ? s.desktopLinkActive : s.desktopLink}
+                    onClick={isActive && router.pathname === page.href ? e => { e.preventDefault(); onCurrentPageClick?.(); } : undefined}
+                  >
+                    {page.label}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </nav>
       </div>
     </header>
@@ -115,7 +187,7 @@ export default function Header({ currentPage, dark, toggleDark, onCurrentPageCli
 function getStyles(dark, isMobile = false) {
   const headerBg  = dark ? '#1A1A1A' : '#FFFFFF';
   const text1     = dark ? '#EEEEEE' : '#000000';
-  const textMuted = dark ? '#888888' : '#666666';
+  const textMuted = dark ? '#777777' : '#777777';
 
   return {
     header: {
@@ -128,26 +200,36 @@ function getStyles(dark, isMobile = false) {
     headerInner: {
       maxWidth: '800px',
       margin: '0 auto',
-      padding: isMobile ? '12px 14px' : '12px 24px',
+      padding: isMobile ? '10px 14px' : '10px 24px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
+      gap: '12px',
+      position: 'relative',
+    },
+    mobilePageLabel: {
+      position: 'absolute',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      color: text1,
+      fontSize: '0.9rem',
+      fontWeight: 700,
+      whiteSpace: 'nowrap',
+      pointerEvents: 'none',
     },
     headerLogo: {
       display: 'flex',
       alignItems: 'center',
-      gap: isMobile ? '8px' : '12px',
+      gap: isMobile ? '8px' : '10px',
       textDecoration: 'none',
-      minWidth: 0,
-      overflow: 'hidden',
+      flexShrink: 0,
     },
     headerTextWrap: {
       minWidth: 0,
-      overflow: 'hidden',
     },
     headerThumb: {
-      width: '36px',
-      height: '36px',
+      width: '34px',
+      height: '34px',
       objectFit: 'cover',
       borderRadius: '4px',
       background: '#FCBF22',
@@ -155,16 +237,14 @@ function getStyles(dark, isMobile = false) {
     },
     headerTitle: {
       color: text1,
-      fontSize: isMobile ? '0.875rem' : '1rem',
+      fontSize: isMobile ? '0.875rem' : '0.95rem',
       fontWeight: 900,
       letterSpacing: '-0.03em',
       whiteSpace: 'nowrap',
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
     },
     headerSub: {
       color: textMuted,
-      fontSize: '0.68rem',
+      fontSize: '0.62rem',
       fontWeight: 500,
       letterSpacing: '0.04em',
       textTransform: 'uppercase',
@@ -172,7 +252,7 @@ function getStyles(dark, isMobile = false) {
     },
     nav: {
       display: 'flex',
-      gap: isMobile ? '8px' : '20px',
+      gap: '8px',
       alignItems: 'center',
       flexShrink: 0,
     },
@@ -184,57 +264,131 @@ function getStyles(dark, isMobile = false) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      width: '44px',
-      height: '44px',
-      borderRadius: '10px',
+      width: '36px',
+      height: '36px',
+      borderRadius: '8px',
       padding: 0,
       flexShrink: 0,
     },
-    navDropdownBtn: {
-      background: 'none',
-      border: `1px solid ${dark ? '#444444' : '#DDDDDD'}`,
-      borderRadius: '10px',
-      padding: isMobile ? '0 8px 0 10px' : '0 14px 0 16px',
-      height: '44px',
-      minWidth: isMobile ? '152px' : '182px',
+    hamburgerBtn: {
+      background: dark ? '#2A2A2A' : '#F0F0F0',
+      border: 'none',
       cursor: 'pointer',
       color: text1,
-      fontSize: isMobile ? '0.875rem' : '1rem',
-      fontWeight: 600,
       display: 'flex',
       alignItems: 'center',
-      gap: '8px',
+      justifyContent: 'center',
+      width: '36px',
+      height: '36px',
+      borderRadius: '8px',
+      padding: 0,
+    },
+    desktopLinks: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '2px',
+      flexWrap: 'wrap',
+      justifyContent: 'flex-end',
+    },
+    desktopLink: {
+      color: textMuted,
+      textDecoration: 'none',
+      fontSize: '0.78rem',
+      fontWeight: 500,
+      padding: '5px 7px',
+      borderRadius: '6px',
       whiteSpace: 'nowrap',
+      borderBottom: '2px solid transparent',
     },
-    navDropdown: {
-      position: 'absolute',
-      top: 'calc(100% + 6px)',
+    desktopLinkActive: {
+      color: text1,
+      textDecoration: 'none',
+      fontSize: '0.78rem',
+      fontWeight: 700,
+      padding: '5px 7px',
+      borderRadius: '6px',
+      whiteSpace: 'nowrap',
+      borderBottom: '2px solid #FCBF22',
+    },
+    backdrop: {
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0,0,0,0.5)',
+      zIndex: 150,
+    },
+    offcanvas: {
+      position: 'fixed',
+      top: 0,
       right: 0,
+      bottom: 0,
+      width: '280px',
       background: headerBg,
-      border: `1px solid ${dark ? '#444444' : '#DDDDDD'}`,
-      borderRadius: '10px',
-      overflow: 'hidden',
-      boxShadow: dark ? '0 4px 16px rgba(0,0,0,0.5)' : '0 4px 16px rgba(0,0,0,0.08)',
-      minWidth: '150px',
+      borderLeft: `3px solid #FCBF22`,
       zIndex: 200,
+      overflowY: 'auto',
+      display: 'flex',
+      flexDirection: 'column',
     },
-    navDropdownItem: {
+    offcanvasHeader: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '14px 16px',
+      borderBottom: `1px solid ${dark ? '#2A2A2A' : '#EEEEEE'}`,
+    },
+    offcanvasLogo: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      textDecoration: 'none',
+    },
+    offcanvasTitle: {
+      color: text1,
+      fontSize: '0.95rem',
+      fontWeight: 900,
+      letterSpacing: '-0.03em',
+    },
+    offcanvasSub: {
+      color: textMuted,
+      fontSize: '0.62rem',
+      fontWeight: 500,
+      letterSpacing: '0.04em',
+      textTransform: 'uppercase',
+      marginTop: '1px',
+    },
+    closeBtn: {
+      background: dark ? '#2A2A2A' : '#F0F0F0',
+      border: 'none',
+      cursor: 'pointer',
+      color: text1,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '36px',
+      height: '36px',
+      borderRadius: '8px',
+      padding: 0,
+      flexShrink: 0,
+    },
+    offcanvasLink: {
       display: 'block',
-      padding: '13px 20px',
+      padding: '16px 20px',
       color: textMuted,
       textDecoration: 'none',
       fontSize: '1rem',
       fontWeight: 500,
+      borderBottom: `1px solid ${dark ? '#2A2A2A' : '#F0F0F0'}`,
     },
-    navDropdownItemActive: {
+    offcanvasLinkActive: {
       display: 'block',
-      padding: '13px 20px 13px 17px',
+      padding: '16px 20px 16px 17px',
       color: text1,
       textDecoration: 'none',
       fontSize: '1rem',
       fontWeight: 700,
-      background: dark ? '#252525' : '#F8F8F8',
+      borderBottom: `1px solid ${dark ? '#2A2A2A' : '#F0F0F0'}`,
       borderLeft: '3px solid #FCBF22',
+      background: dark ? '#252525' : '#F8F8F8',
     },
   };
 }

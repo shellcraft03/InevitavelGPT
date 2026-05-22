@@ -1,159 +1,151 @@
 import OpenAI from 'openai';
-import { checkMinuteLimit, checkDailyLimit, logBlock } from '../../lib/rateLimiter.js';
-import { queryEmbedding } from '../../lib/vectorStore.js';
-import { verifyTurnstile } from '../../lib/turnstile.js';
+import { getIndexNameForNamespace } from '../../lib/vectorStore.js';
+import { intFromEnv, cleanRetrievalQuery, RAG_INITIAL_TOP_K_SPEC, RAG_RERANK_CANDIDATES_SPEC, RAG_FINAL_CHUNKS_SPEC } from '../../lib/chat-utils.js';
+import { guardChatRequest, retrieveChunks, setupSse, streamCompletion } from '../../lib/rag.js';
+import { LIVRO_TOPIC_EXPANSIONS, LIVRO_STOPWORDS } from '../../lib/rag-domains.js';
 
-const MAX_QUESTION_LENGTH = 1000;
 const TURNSTILE_ACTION = 'chat';
+const LIVRO_NAMESPACE = 'livro-amarelo-v2';
+const EMBEDDING_MODEL = 'text-embedding-3-large';
+const QUERY_REWRITE_MODEL = process.env.QUERY_REWRITE_MODEL || 'gpt-4.1-nano';
+const RERANK_MODEL = process.env.LIVRO_RERANK_MODEL || 'gpt-4.1-nano';
+const CHAT_MODEL = 'gpt-4.1';
+
+const INITIAL_TOP_K     = intFromEnv('LIVRO_INITIAL_TOP_K',     ...RAG_INITIAL_TOP_K_SPEC);
+const RERANK_CANDIDATES = intFromEnv('LIVRO_RERANK_CANDIDATES', ...RAG_RERANK_CANDIDATES_SPEC);
+const FINAL_CHUNKS      = intFromEnv('LIVRO_FINAL_CHUNKS',      ...RAG_FINAL_CHUNKS_SPEC);
 
 const client = new OpenAI({ apiKey: process.env.CUSTOM_OPENAI_API_KEY || process.env.OPENAI_API_KEY });
 
 const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT_LIVRO;
 if (!SYSTEM_PROMPT) throw new Error('Missing env var: SYSTEM_PROMPT_LIVRO');
+const QUERY_REWRITE_PROMPT = process.env.SYSTEM_PROMPT_QUERY_REWRITE_LIVRO;
+if (!QUERY_REWRITE_PROMPT) throw new Error('Missing env var: SYSTEM_PROMPT_QUERY_REWRITE_LIVRO');
+
+const RERANK_SYSTEM_PROMPT = [
+  'Voce reranqueia trechos do Livro Amarelo para responder uma pergunta.',
+  'Use apenas a relevancia dos trechos para a pergunta.',
+  'Prefira trechos que respondem diretamente, com detalhes concretos.',
+  'Retorne somente um array JSON com os ids dos trechos mais relevantes em ordem.',
+  `Retorne no maximo ${FINAL_CHUNKS} ids.`,
+].join(' ');
 
 export const config = {
   api: {
-    bodyParser: {
-      sizeLimit: '2kb',
-    },
+    bodyParser: { sizeLimit: '2kb' },
     responseLimit: false,
   },
 };
 
-function getIp(req) {
-  const forwardedFor = req.headers['x-forwarded-for'];
-  const realIp = req.headers['x-real-ip'];
-  return (forwardedFor || realIp || req.socket.remoteAddress || '').toString().split(',')[0].trim() || 'unknown';
+function buildRetrievalQuery(question) {
+  let focused = question
+    .replace(/^(o que|qual|quais|como)\s+(o\s+)?(livro amarelo|plano)\s+(diz|fala|trata|propoe)\s+(sobre|a respeito de)\s+/i, '')
+    .replace(/^(o que|qual|quais|como)\s+(sao|são|e|é)\s+as?\s+propostas?\s+(para|sobre|de)\s+/i, '')
+    .trim();
+  if (!focused) focused = question;
+  const expansions = LIVRO_TOPIC_EXPANSIONS
+    .filter(({ pattern }) => pattern.test(question))
+    .map(({ terms }) => terms);
+  return [focused, question, ...expansions].join('\n');
 }
 
-function sanitizeQuestion(raw) {
-  return raw
-    .toString()
-    .normalize('NFKC')
-    .trim()
-    .slice(0, MAX_QUESTION_LENGTH)
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/[^a-zA-ZÀ-ú0-9\s.,!?;:()\-'"/%\n]/g, '');
+async function rewriteRetrievalQuery(question) {
+  const fallback = buildRetrievalQuery(question);
+  try {
+    const completion = await client.chat.completions.create({
+      model: QUERY_REWRITE_MODEL,
+      temperature: 0,
+      max_tokens: 100,
+      messages: [
+        { role: 'system', content: QUERY_REWRITE_PROMPT },
+        { role: 'user', content: question },
+      ],
+    });
+    const rewritten = cleanRetrievalQuery(completion.choices?.[0]?.message?.content);
+    return rewritten
+      ? [rewritten, fallback, `Pergunta original: ${question}`].join('\n')
+      : fallback;
+  } catch (err) {
+    console.warn('[rag][livro] query rewrite failed:', err?.message || err);
+    return fallback;
+  }
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!String(req.headers['content-type'] || '').toLowerCase().startsWith('application/json')) {
-    return res.status(415).json({ error: 'Unsupported media type' });
-  }
-
   const t0 = Date.now();
-
   try {
-    const { question: rawQuestion, turnstileToken } = req.body || {};
-    if (!rawQuestion) return res.status(400).json({ error: 'Missing question' });
-
-    const question = sanitizeQuestion(rawQuestion);
-    if (!question) return res.status(400).json({ error: 'Question is empty' });
-
-    const ip = getIp(req);
-
-    const [okRes, rl, daily] = await Promise.all([
-      verifyTurnstile(turnstileToken, { ip, action: TURNSTILE_ACTION }),
-      checkMinuteLimit(ip),
-      checkDailyLimit(ip),
-    ]);
-    console.log(`[timing][chat] auth=${Date.now() - t0}ms`);
-
-    if (!okRes.ok) {
-      console.warn(`[turnstile] failed ip=${ip} reason=${okRes.reason || 'unknown'}`);
-      return res.status(403).json({ error: 'Turnstile verification failed' });
-    }
-
-    res.setHeader('X-RateLimit-Remaining', String(rl.remaining));
-    res.setHeader('X-RateLimit-Reset', String(rl.resetSeconds));
-    if (!rl.ok) {
-      console.warn(`[rate-limit] per-minute ip=${ip} remaining=${rl.remaining} reset=${rl.resetSeconds}s`);
-      await logBlock(ip, 'minute');
-      return res.status(429).json({ error: 'Too many requests' });
-    }
-
-    if (!daily.ok) {
-      console.warn(`[rate-limit] daily ip=${ip} remaining=${daily.remaining} reset=${daily.resetSeconds}s`);
-      await logBlock(ip, 'daily');
-      return res.status(429).json({ error: 'Daily limit reached' });
-    }
+    const guard = await guardChatRequest(req, res, { turnstileAction: TURNSTILE_ACTION, label: 'chat', t0 });
+    if (!guard) return;
+    const { question } = guard;
 
     let messages;
     let sources = [];
 
     if (process.env.USE_RAG === 'true') {
-      const preferred = process.env.EMBEDDING_MODEL ? process.env.EMBEDDING_MODEL.split(',') : ['text-embedding-3-small'];
-      const alternatives = ['text-embedding-3-large', 'text-embedding-3-small', 'text-embedding-ada-002'];
-      const modelsToTry = [...new Set([...preferred, ...alternatives])];
-      let emb = null;
-      for (const m of modelsToTry) {
-        try {
-          emb = await client.embeddings.create({ model: m, input: question });
-          break;
-        } catch (e) {
-          console.error(`embedding model ${m} failed:`, e?.message || e);
-        }
+      const { chunks: top, dims, retrievalQuery } = await retrieveChunks(client, question, {
+        namespace: LIVRO_NAMESPACE,
+        embeddingModel: EMBEDDING_MODEL,
+        initialTopK: INITIAL_TOP_K,
+        rerankCandidates: RERANK_CANDIDATES,
+        finalChunks: FINAL_CHUNKS,
+        rerankModel: RERANK_MODEL,
+        rerankSystemPrompt: RERANK_SYSTEM_PROMPT,
+        buildRerankItem: (match, index) => ({
+          id: match.id || String(index),
+          title: match.meta?.title || match.meta?.file || '',
+          page: match.meta?.page ?? null,
+          text: String(match.text || '').slice(0, 250),
+        }),
+        rewriteQueryFn: rewriteRetrievalQuery,
+        topicExpansions: LIVRO_TOPIC_EXPANSIONS,
+        stopwords: LIVRO_STOPWORDS,
+        buildHaystack: (m) => `${m.meta?.title || ''} ${m.meta?.file || ''} ${m.text || ''}`,
+        label: 'livro',
+      });
+      console.log(`[timing][chat] retrieval=${Date.now() - t0}ms model=${EMBEDDING_MODEL} dims=${dims}`);
+      if (process.env.DEBUG_RAG === 'true') {
+        console.log('[rag][livro]', {
+          index: getIndexNameForNamespace(LIVRO_NAMESPACE),
+          namespace: LIVRO_NAMESPACE,
+          originalQuestion: question,
+          embeddingQuery: retrievalQuery,
+          matches: top.map(t => ({
+            id: t.id,
+            score: Number(t.score?.toFixed?.(4) ?? t.score),
+            rerankScore: Number(t.rerankScore?.toFixed?.(4) ?? t.rerankScore),
+            lexicalHits: t.lexicalHits,
+            llmReranked: Boolean(t.llmReranked),
+            title: t.meta?.title || '',
+            file: t.meta?.file || '',
+            page: t.meta?.page ?? null,
+          })),
+        });
       }
-      console.log(`[timing][chat] embedding=${Date.now() - t0}ms`);
-
-      let top;
-      if (emb?.data?.[0]?.embedding) {
-        top = await queryEmbedding(emb.data[0].embedding, 6);
-      } else {
-        console.warn('Embedding not available for query; using text-match fallback');
-        top = await queryEmbedding(question, 6);
-      }
-      console.log(`[timing][chat] pinecone=${Date.now() - t0}ms`);
-
       const contextText = top.map((t, i) =>
         `<fonte id="${i + 1}" arquivo="${t.meta?.file || 'unknown'}" pagina="${t.meta?.page}" score="${t.score?.toFixed(3)}">\n${t.text}\n</fonte>`
       ).join('\n');
-
       messages = [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `<contexto>\n${contextText}\n</contexto>\n<pergunta>${question}</pergunta>\nResposta:` }
+        { role: 'user', content: `<contexto>\n${contextText}\n</contexto>\n<pergunta>${question}</pergunta>\nResposta:` },
       ];
-      sources = top.map((t, i) => ({ source: `Source ${i + 1}`, file: t.meta?.file, page: t.meta?.page, score: t.score }));
+      sources = top.map((t, i) => ({
+        source: `Source ${i + 1}`,
+        file: t.meta?.file,
+        page: t.meta?.page,
+        chunk: t.meta?.chunk,
+        title: t.meta?.title,
+        score: t.score,
+      }));
     } else {
       messages = [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `<pergunta>${question}</pergunta>\nResposta:` }
+        { role: 'user', content: `<pergunta>${question}</pergunta>\nResposta:` },
       ];
     }
 
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache, no-transform');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
-    if (res.socket) res.socket.setNoDelay(true);
-    res.flushHeaders();
-
-    const sendEvent = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
-
+    const sendEvent = setupSse(res);
     try {
-      const stream = await client.chat.completions.create({
-        model: 'gpt-4.1-mini',
-        messages,
-        max_tokens: 600,
-        stream: true,
-      });
-      console.log(`[timing][chat] openai_stream_open=${Date.now() - t0}ms`);
-
-      let firstToken = true;
-      for await (const chunk of stream) {
-        const token = chunk.choices?.[0]?.delta?.content;
-        if (token) {
-          if (firstToken) {
-            console.log(`[timing][chat] first_token=${Date.now() - t0}ms`);
-            firstToken = false;
-          }
-          sendEvent({ token });
-        }
-      }
-
-      console.log(`[timing][chat] total=${Date.now() - t0}ms`);
+      await streamCompletion(client, sendEvent, messages, { model: CHAT_MODEL, maxTokens: 1400, label: 'chat', t0 });
       sendEvent({ done: true, sources });
       res.end();
     } catch (streamErr) {

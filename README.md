@@ -2,7 +2,7 @@
 
 **🌐 Language / Idioma:** [English](README.en.md) . [Português](README.md)
 
-# o Livro Amarelo — Q&A
+# InevitávelGPT — Q&A
 
 **Explore o Livro Amarelo e as entrevistas de Renan Santos por meio de perguntas em linguagem natural.**
 
@@ -11,7 +11,7 @@ RAG (Retrieval-Augmented Generation) com OpenAI · Protegido por Cloudflare Turn
 ---
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs)
-![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4.1--mini-412991?style=flat-square&logo=openai)
+![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4.1-412991?style=flat-square&logo=openai)
 ![Pinecone](https://img.shields.io/badge/Pinecone-Vector%20DB-00B07D?style=flat-square)
 ![Neon](https://img.shields.io/badge/Neon-Postgres-00E699?style=flat-square&logo=postgresql&logoColor=black)
 ![Upstash](https://img.shields.io/badge/Upstash-Rate%20Limit-00E9A3?style=flat-square&logo=upstash)
@@ -33,14 +33,17 @@ Esta aplicação web permite explorar o conteúdo do Livro Amarelo e as entrevis
 ## Funcionalidades
 
 - **RAG completo** — busca semântica por embeddings + geração de resposta contextualizada
-- **Renan Responde** — Q&A com base em entrevistas do YouTube: transcrição automática, filtro de speaker por IA, chunking por fronteira de frase, citações inline `[1][2]` com link direto para o trecho no vídeo
+- **Renan Responde** — Q&A com base em entrevistas do YouTube: transcrição automática, filtro de speaker por IA, chunking por fronteira de frase, citações inline `[1][2]` com link direto para o trecho no vídeo; botões de cópia do texto e download da resposta como imagem
 - **Curadoria automática de entrevistas** — agente de IA avalia periodicamente links submetidos por usuários e aprova/reprova com base em critérios (entrevistado principal, entrevista completa, canal independente, conteúdo político substantivo)
 - **Submissão de vídeos por usuários** — formulário na página `/entrevistas` para sugerir links do YouTube; protegido por Turnstile + rate limit
-- **Proteção por CAPTCHA** — Cloudflare Turnstile com inicialização lazy (ativa apenas no foco do input) e token renovado por requisição
+- **Proteção por CAPTCHA** — Cloudflare Turnstile com inicialização lazy (ativa apenas no foco do input); na entrada cria um cookie de sessão HMAC-SHA256 HttpOnly (TTL 1h) — endpoints de chat pulam o Turnstile enquanto a sessão for válida
 - **Rate limiting compartilhado** — 10 req/min e 50 req/dia por IP via Sliding Window (`@upstash/ratelimit`); contadores compartilhados entre todos os endpoints (chat do livro, chat de entrevistas e submissão de vídeos) · fallback em memória (dev local)
+- **Bloqueio de canais** — curadoria rejeita automaticamente vídeos de canais configurados em `BLOCKED_YOUTUBE_CHANNEL_NAMES` (termos separados por `;`)
 - **Respostas concretas** — o modelo cita apenas o que está explicitamente nas fontes indexadas
 - **Deputados federais** — página `/deputados` com composição da Câmara por partido e estado, via API da Câmara dos Deputados
 - **Filiados partidários** — página `/filiados` com dados de filiação por partido e estado, atualizada automaticamente toda segunda-feira via GitHub Actions a partir dos dados públicos do TSE
+- **Doações via Pix (Livepix)** — usuários do Bot X/Twitter fazem doações via Pix; o saldo é creditado automaticamente via webhook e convertido em créditos para uso no bot
+- **Sentimento eleitoral 2026** — rastreador de sentimento para as eleições presidenciais brasileiras: coleta RSS, Twitter/X e odds do Polymarket; classifica por candidato via GPT; exibe pontuações, histórico e lista de notícias diárias; worker Python deployado no Railway (`IngestaoSentimento/`)
 - **Responsivo** — layout adaptado para desktop e dispositivos móveis
 
 ---
@@ -50,16 +53,20 @@ Esta aplicação web permite explorar o conteúdo do Livro Amarelo e as entrevis
 | Camada | Tecnologia |
 |---|---|
 | Frontend | Next.js 16 · React 18 |
-| LLM | OpenAI GPT-4.1-mini (livro) · GPT-4.1 (entrevistas) |
-| Embeddings | OpenAI text-embedding-3-small (livro) · text-embedding-3-large (entrevistas) |
-| Vector store | Pinecone — namespace `default` (livro) e `entrevistas` (YouTube) |
+| LLM | OpenAI GPT-4.1 (livro e entrevistas) |
+| Embeddings | OpenAI text-embedding-3-large (livro e entrevistas) |
+| Vector store | Pinecone — namespace `livro-amarelo-v2` (livro) e `entrevistas` (YouTube) |
 | Banco relacional | Neon Postgres (serverless) |
-| Transcrição YouTube | youtube-transcript-api (Python, CI) · youtube-transcript (Node, local) |
+| Transcrição YouTube | youtube-transcript-api (Python, CI e local via `fetch_transcript.py`) |
 | CAPTCHA | Cloudflare Turnstile |
 | Rate limit | @upstash/ratelimit · Sliding Window · Upstash Redis (serverless) · fallback em memória (dev local) |
 | Analytics | Google Analytics 4 |
 | PDF parsing | pdf-parse |
 | Automação de dados | GitHub Actions (cron semanal + disparo manual) |
+| Geração de imagens (bot) | canvas (node-canvas) · Inter TTF bundled em `public/fonts/` |
+| Bot X/Twitter | Python 3.11 · Railway (worker multiusuário) · X API v2 |
+| Sentimento eleitoral | Python 3.11 · Railway (cron horário) · OpenAI GPT-4o-mini · X API v2 · Polymarket API |
+| Pagamentos | Livepix (Pix) — webhook para crédito automático de saldo |
 
 ---
 
@@ -78,26 +85,49 @@ livro-amarelo/
 │   ├── entrevistas.js               # Lista de entrevistas indexadas + submissão de sugestões
 │   ├── deputados.js                 # Deputados federais por partido e estado
 │   ├── filiados.js                  # Filiados partidários por estado
+│   ├── sentimento.js                # Rastreador de sentimento eleitoral 2026
+│   ├── metodologia-sentimento.js    # Explicação do método de pontuação (cálculo dinâmico)
+│   ├── noticias-sentimento.js       # Notícias do dia com classificações
+│   ├── doacoes.js                   # Página de doações ("Apoie") — pública, sem proteção de sessão
 │   ├── sobre.js                     # Sobre o projeto
 │   ├── privacidade.js               # Política de privacidade
 │   ├── _app.js                      # App wrapper — CSS global + Google Analytics
 │   └── api/
 │       ├── chat.js                  # RAG + LLM — Livro Amarelo
 │       ├── chat-entrevistas.js      # RAG + LLM — Entrevistas YouTube (namespace entrevistas)
+│       ├── session.js               # GET verifica sessão · POST cria cookie de sessão via Turnstile
 │       ├── videos.js                # GET lista indexadas · POST submissão de sugestão
 │       ├── deputados.js             # Deputados (Neon + join com filiados)
-│       └── filiados.js              # Filiados (Neon Postgres)
+│       ├── filiados.js              # Filiados (Neon Postgres)
+│       ├── sentimento.js            # Dados de sentimento por candidato (leitura do Neon)
+│       ├── noticias-sentimento.js   # Notícias do dia com classificações
+│       ├── tweets-sentimento.js     # Tweets do dia por candidato
+│       ├── bot/
+│       │   ├── answer.js            # RAG para o bot — retorna { answer, question, type } (X-Bot-Secret)
+│       │   └── image.js             # Gera JPEG 1080px com node-canvas + Inter TTF (X-Bot-Secret)
+│       └── livepix/
+│           ├── create-payment.js    # Cria cobrança Pix via Livepix e grava referência no Neon
+│           └── webhook.js           # Recebe confirmação de pagamento e credita saldo do usuário
 ├── hooks/
-│   └── useTurnstile.js              # Hook React para o widget Turnstile
+│   ├── useTurnstile.js              # Hook React para o widget Turnstile
+│   ├── useSessionGate.js            # Hook React para verificar sessão via cookie e redirecionar se inválida
+│   ├── useDarkMode.js               # Hook React para modo escuro (padrão: ligado; persiste no localStorage)
+│   └── usePullToRefresh.js          # Hook React para pull-to-refresh em dispositivos móveis
 ├── lib/
 │   ├── turnstile.js                 # Verificação server-side do token
+│   ├── session.js                   # Geração e validação de cookie de sessão HMAC-SHA256
 │   ├── chunker.js                   # Divisão e normalização de texto (PDF)
 │   ├── vectorStore.js               # Armazenamento e busca de embeddings (Pinecone)
-│   └── rateLimiter.js               # Rate limiting por IP (compartilhado entre endpoints)
+│   ├── rateLimiter.js               # Rate limiting por IP (compartilhado entre endpoints)
+│   ├── chat-utils.js                # Utilitários compartilhados: sanitize, normaliza, intFromEnv, getIp, parseRankedIds, defaults RAG
+│   ├── rag.js                       # Pipeline RAG compartilhado: guard de requisição, lexical rank, LLM rerank, retrieve, SSE, streaming
+│   └── rag-domains.js               # Expansões de tópico e stopwords por domínio (livro e entrevistas)
+├── proxy.js                         # Middleware Next.js: CSP nonce-based por requisição; injeta header x-nonce para _document e GA
 ├── curar-indexar.bat                # Menu interativo local para gestão de vídeos (curadoria + indexação)
 ├── scripts/
-│   ├── process_videos_ci.py         # CI: curadoria + indexação em passagem única (Python, sem download duplo)
+│   ├── process_videos_ci.py         # CI: curadoria + indexação em passagem única (Python); bloqueia canais configurados; prefere proxies BR → US
 │   ├── migrate_videos.mjs           # Cria/atualiza tabela videos no Neon
+│   ├── fetch_transcript.py          # Helper Python para transcrição local: youtube-transcript-api + proxy Webshare; chamado por curate_videos.mjs e index_youtube.mjs via spawnSync
 │   ├── curate_videos.mjs            # Curadoria de vídeos pendentes por GPT-4.1-mini (uso local)
 │   ├── index_youtube.mjs            # Transcrição, filtro speaker, chunking, embeddings → Pinecone (uso local)
 │   ├── manage_videos.mjs            # Gestão manual: listar, aprovar, reprovar e resetar vídeos
@@ -111,8 +141,48 @@ livro-amarelo/
 │   └── migrate_to_pinecone.mjs      # Migrar vetores do store.json para o Pinecone
 ├── styles/
 │   └── globals.css                  # Paleta de cores, reset e classes responsivas
-└── public/
-    └── cover.png                    # Ilustração da capa
+├── public/
+│   ├── cover.png                    # Ilustração da capa
+│   └── fonts/                       # Inter TTF bundled para geração de imagem no servidor
+│       ├── Inter-Regular.ttf
+│       ├── Inter-Bold.ttf
+│       ├── Inter-Italic.ttf
+│       └── Inter-BoldItalic.ttf
+├── BotTwitter2/                     # Worker Python multiusuário — Bot X/Twitter (Railway)
+│   ├── Procfile                     # worker: python main.py
+│   ├── runtime.txt                  # python-3.11
+│   ├── requirements.txt
+│   ├── conftest.py                  # fixtures pytest: env vars para testes sem credenciais reais
+│   ├── main.py                      # loop principal do worker
+│   ├── run-local-worker.bat          # carrega .env local e executa o worker no Windows
+│   ├── tests/
+│   │   └── test_worker.py           # testes de _parse_tweet, _strip_accents e _error_code
+│   └── InevitavelGPT2/
+│       ├── api.py                   # chama /api/bot/answer e /api/bot/image
+│       ├── db.py                    # conexão Neon
+│       ├── worker.py                # orquestração multiusuário
+│       └── x_api.py                 # leitura de menções, upload de mídia e reply
+├── __tests__/
+│   └── lib/
+│       ├── chat-utils.test.js       # testes de sanitize, normaliza, intFromEnv, getIp, parseRankedIds
+│       ├── session.test.js          # testes de cookie HMAC-SHA256 (emissão, validação, expiração, tamper)
+│       ├── turnstile.test.js        # testes de verifyTurnstile (mocks de fetch)
+│       ├── rateLimiter.test.js      # testes do fallback em memória (minute + daily limit)
+│       └── rag.test.js              # testes de buildTopicTerms, lexicalRank, llmRerankChunks e setupSse
+└── IngestaoSentimento/              # Worker Python — rastreador de sentimento eleitoral (Railway)
+    ├── railway.toml                 # cron horário; startCommand = python main.py
+    ├── conftest.py                  # fixtures pytest: env vars para testes sem credenciais reais
+    ├── main.py                      # orquestrador: RSS + Twitter + Polymarket
+    ├── tests/
+    │   ├── test_classifier.py       # testes de classify_texts_individual (labels, batching, padding)
+    │   └── test_main.py             # testes de _run_twitter_now (flags e horários UTC)
+    └── coleta/
+        ├── config.py                # candidatos e fontes RSS permitidas
+        ├── classifier.py            # classify_texts_individual via OpenAI
+        ├── db.py                    # tabelas Neon: upsert, query e migrações
+        ├── rss.py                   # fetch Google News RSS por candidato
+        ├── twitter.py               # fetch tweets via X API (cursor since_id)
+        └── polymarket.py            # fetch odds via Polymarket API pública
 ```
 
 ---
@@ -139,8 +209,8 @@ TURNSTILE_SECRET=0x...
 
 # Pinecone
 PINECONE_API_KEY=pcsk-...
-PINECONE_INDEX=nome-do-index               # índice do livro (1536 dim, text-embedding-3-small)
-PINECONE_INDEX_ENTREVISTAS=nome-do-index   # índice de entrevistas (3072 dim, text-embedding-3-large)
+PINECONE_INDEX_LIVRO=nome-do-index         # índice do livro (3072 dim, text-embedding-3-large, namespace livro-amarelo-v2)
+PINECONE_INDEX_ENTREVISTAS=nome-do-index   # índice de entrevistas (3072 dim, text-embedding-3-large, namespace entrevistas)
 
 # Habilitar pipeline RAG
 USE_RAG=true
@@ -152,17 +222,50 @@ UPSTASH_REDIS_REST_TOKEN=...
 # Neon Postgres
 DATABASE_URL=postgresql://...
 
-# Webshare (proxy para YouTube Transcript API — necessário para o script Python de CI)
+# Webshare (proxy para YouTube Transcript API — necessário para CI e scripts locais)
 WEBSHARE_PROXY_USERNAME=...
 WEBSHARE_PROXY_PASSWORD=...
 
-# System prompt de curadoria (usado pelo script Python de CI)
+# System prompts (usados pelos scripts e API routes)
 SYSTEM_PROMPT_CURADORIA=...
+SYSTEM_PROMPT_QUERY_REWRITE_LIVRO=...
+SYSTEM_PROMPT_QUERY_REWRITE_ENTREVISTAS=...
+
+# Sessão de acesso (obrigatório)
+APP_SESSION_SECRET=...
+
+# Canais do YouTube bloqueados na curadoria (termos separados por ";")
+BLOCKED_YOUTUBE_CHANNEL_NAMES=...
+
+# Bot Twitter — protege /api/bot/answer e /api/bot/image
+BOT_API_SECRET=...
+
+# Livepix (pagamentos Pix — Bot X/Twitter)
+LIVEPIX_CLIENT_ID=...
+LIVEPIX_CLIENT_SECRET=...
+LIVEPIX_WEBHOOK_SECRET=...     # obrigatório; protege /api/livepix/webhook
+NEXT_PUBLIC_SITE_URL=https://www.inevitavelgpt.com  # usado para montar a URL de retorno do checkout
 ```
 
-> **Pinecone:** o projeto usa dois índices separados. `PINECONE_INDEX`: dimensão **1536**, compatível com `text-embedding-3-small`, namespace `default` (Livro Amarelo). `PINECONE_INDEX_ENTREVISTAS`: dimensão **3072**, compatível com `text-embedding-3-large`, namespace `entrevistas` (YouTube). Se `PINECONE_INDEX_ENTREVISTAS` não estiver definido, o código usa `PINECONE_INDEX` como fallback.
+> **Pinecone:** o projeto usa dois índices. `PINECONE_INDEX_LIVRO`: dimensão **3072**, compatível com `text-embedding-3-large`, namespace `livro-amarelo-v2` (Livro Amarelo). `PINECONE_INDEX_ENTREVISTAS`: dimensão **3072**, compatível com `text-embedding-3-large`, namespace `entrevistas` (YouTube).
 
 > **Neon:** a tabela `videos` é criada/atualizada pelo script `migrate_videos.mjs`. Execute-o uma vez antes de rodar a indexação de entrevistas.
+
+### Painel admin do Bot X/Twitter
+
+O painel admin do Bot X/Twitter foi preparado como uma aplicação separada, para execução local e manutenção em repositório privado. Por segurança, este repositório público não contém página admin, rotas `/api/.../admin`, autenticação admin, segredo admin ou arquivos do painel.
+
+Esse painel externo usa o mesmo banco Neon do projeto para operar o acesso e a cobrança do Bot X/Twitter. A lógica implementada trabalha sobre as tabelas `igpt2_users`, `igpt2_access_grants`, `igpt2_balance_events`, `igpt2_global_settings`, `igpt2_automation_runs`, `igpt2_automation_state` e `igpt2_livepix_payments`.
+
+Responsabilidades do painel externo:
+
+- buscar usuários conectados ao Bot X/Twitter;
+- alterar status de acesso (`pending`, `approved`, `blocked`);
+- adicionar ou remover saldo em centavos, registrando eventos em `igpt2_balance_events`;
+- configurar o custo global por resposta em `igpt2_global_settings` (`tweet_cost_cents`);
+- consultar os últimos logs operacionais persistidos pelo worker.
+
+O site público apenas consome esses dados: a página do usuário mostra saldo, custo por resposta e histórico recente; o worker `BotTwitter2/` aplica o status, valida saldo e debita o custo configurado no banco a cada resposta publicada.
 
 ### 3. Indexar o Livro Amarelo
 
@@ -223,25 +326,26 @@ npm run build && npm start     # produção
 Usuário
   │
   ▼
-┌───────────────────────────────────┐
-│  /  — Verificação Turnstile       │  Resolve o CAPTCHA → clica "Entrar"
-└─────────────┬─────────────────────┘
-              │ token salvo em sessionStorage
+┌───────────────────────────────────────────────┐
+│  /  — Verificação Turnstile                   │  Resolve o CAPTCHA → clica "Entrar"
+└─────────────┬─────────────────────────────────┘
+              │ POST /api/session → cookie HttpOnly ia_session (HMAC-SHA256, TTL 1h)
               ▼
 ┌─────────────────────────────────────────────────────────┐
 │  /inicio — Q&A Livro Amarelo                            │
 │  /renan-santos-responde — Renan Responde (entrevistas)  │
 └─────────────┬───────────────────────────────────────────┘
-              │ token fresco gerado por requisição (Turnstile invisível)
+              │ GET /api/session valida cookie; redireciona para / se inválido
+              │ cookie ia_session enviado automaticamente pelo browser
               ▼
 ┌───────────────────────────────────────────┐
 │  /api/chat  ou  /api/chat-entrevistas     │
-│  1. Verifica Turnstile                    │
+│  1. Verifica sessão (cookie) ou Turnstile │
 │  2. Rate limit por IP (min + dia)         │
-│  3. Embed a pergunta                      │
-│  4. Busca top-14 chunks (Pinecone)        │
+│  3. Reescreve query + gera embeddings     │
+│  4. Busca e re-ranqueia chunks (Pinecone) │
 │  5. Monta prompt com contexto             │
-│  6. GPT-4.1-mini responde via streaming   │
+│  6. GPT-4.1 responde via streaming        │
 └─────────────┬─────────────────────────────┘
               │
               ▼
@@ -278,10 +382,80 @@ Usuário
 
 ---
 
+## Bot X/Twitter multiusuário
+
+O diretório `BotTwitter2/` contém o **worker Python** implantado no **Railway** para operar o Bot X/Twitter com contas de usuários autenticados. O usuário conecta sua conta X/Twitter para se identificar — o worker monitora as menções ao **@Inevitavel_Bot** e processa apenas aquelas feitas por contas aprovadas, publicando as respostas pelo perfil **@Inevitavel_Bot** usando credenciais OAuth 1.0a próprias do bot.
+
+O worker lê menções ao @Inevitavel_Bot via OAuth 1.0a e só processa tweets que contenham a palavra-chave configurada em `INEVITAVEL_GPT_KEYWORD` junto com "livro amarelo" ou "renan santos", e cujo autor esteja na lista de contas aprovadas com saldo suficiente. Depois gera a resposta via RAG, cria a imagem e publica o reply pelo @Inevitavel_Bot.
+
+Para teste local no Windows, configure `BotTwitter2/InevitavelGPT2/.env` e execute `BotTwitter2/run-local-worker.bat`. O script também pode carregar variáveis do `.env.local` da raiz quando necessário.
+
+### Como funciona
+
+```
+Usuário conecta a própria conta X/Twitter em /inevitavelgpt2
+  │
+  ▼
+OAuth callback salva usuário, status e estado no Neon
+  │
+  ▼
+Worker BotTwitter2 Railway/local (main.py — loop periódico)
+  │ seleciona contas aprovadas com saldo suficiente
+  │ lê menções ao @Inevitavel_Bot
+  │
+  ├─ Nenhuma menção nova → aguarda próximo ciclo
+  │
+  ▼
+worker.py
+  │ filtra menções de autores não aprovados ou sem saldo
+  │ exige palavra-chave configurada + tema elegível
+  │ extrai pergunta + tipo (livro | entrevistas)
+  │
+  ▼
+POST /api/bot/answer  (Vercel · X-Bot-Secret)
+  │ RAG idêntico ao chat da web
+  ▼
+POST /api/bot/image   (Vercel · X-Bot-Secret)
+  │ node-canvas + Inter TTF bundled → JPEG 1080px
+  ▼
+OAuth 1.0a @Inevitavel_Bot: upload mídia + reply ao tweet original
+  │
+  ▼
+saldo debitado em igpt2_access_grants
+evento registrado em igpt2_balance_events
+execução resumida registrada em igpt2_automation_runs
+cursor global atualizado em igpt2_global_settings (bot_mentions_since_id)
+```
+
+### Deploy no Railway
+
+1. Conecte o repositório ao Railway e aponte o **root directory** para `BotTwitter2/`.
+2. Não é necessário volume para estado: o `BotTwitter2/` persiste estado no Neon.
+3. Configure as variáveis de ambiente abaixo no painel do Railway.
+
+### Variáveis de ambiente — Railway
+
+| Variável | Descrição |
+|---|---|
+| `DATABASE_URL` | URL do Neon usado pelo site e pelo worker |
+| `BOT_API_URL` | URL de `/api/bot/answer` na Vercel ou localmente (ex.: `https://www.inevitavelgpt.com/api/bot/answer`) |
+| `BOT_API_SECRET` | Mesmo valor de `BOT_API_SECRET` configurado na Vercel |
+| `INEVITAVEL_GPT_KEYWORD` | Palavra-chave obrigatória no tweet (ex.: `GPT`); sem padrão |
+| `BOT_CONSUMER_KEY` | API Key do app X/Twitter do bot (OAuth 1.0a) |
+| `BOT_CONSUMER_SECRET` | API Key Secret do app X/Twitter do bot (OAuth 1.0a) |
+| `BOT_ACCESS_TOKEN` | Access Token do perfil @Inevitavel_Bot (OAuth 1.0a) |
+| `BOT_ACCESS_TOKEN_SECRET` | Access Token Secret do perfil @Inevitavel_Bot (OAuth 1.0a) |
+| `IGPT2_WORKER_INTERVAL_SECONDS` | Intervalo opcional em segundos; padrão local `60`, Railway `300` |
+
+> `BOT_API_SECRET` também deve estar definido nas variáveis de ambiente da **Vercel** — ele protege tanto `/api/bot/answer` quanto `/api/bot/image`.
+
+---
+
 ## Scripts disponíveis
 
 | Comando | Descrição |
 |---|---|
+| `npm test` | Executa a suite de testes Jest (`__tests__/`) |
 | `npm run dev` | Servidor de desenvolvimento na porta 3000 |
 | `npm run build` | Build de produção |
 | `npm start` | Servidor de produção |
@@ -305,8 +479,51 @@ Usuário
 
 ---
 
+## Sentimento eleitoral 2026 (IngestaoSentimento)
+
+O diretório `IngestaoSentimento/` contém o **worker Python** implantado no **Railway** que coleta e classifica dados de sentimento para o rastreador eleitoral 2026.
+
+### O que coleta
+
+- **RSS** — Google News por candidato; artigos classificados individualmente por GPT como positivo, neutro ou negativo; apenas artigos com data de publicação no dia atual (UTC) são processados
+- **Twitter/X** — tweets mencionando cada candidato, coletados via X API v2 com cursor `since_id` para evitar reprocessamento
+- **Polymarket** — odds de vitória por candidato via API pública
+
+### Método de pontuação
+
+Cada fonte gera uma pontuação ajustada pela confiança (volume de dados):
+
+```
+bruto      = (% positivo − % negativo + 100) ÷ 2   [escala 0–100]
+confiança  = min(volume / 30, 1)                    [satura em 30 itens]
+ajustado   = 50 + (bruto − 50) × confiança
+```
+
+Pontuação geral: média ponderada das fontes disponíveis — **Polymarket 80% · Notícias 10% · Twitter 10%**.
+
+### Agendamento
+
+O worker roda a cada hora (`0 * * * *` no Railway). O Twitter é coletado apenas nas horas configuradas em `TWITTER_UTC_HOURS` (padrão: `15,18,21` = 12h, 15h, 18h BRT).
+
+### Variáveis de ambiente — Railway (IngestaoSentimento)
+
+| Variável | Descrição |
+|---|---|
+| `DATABASE_URL` | Neon — mesmo banco do site |
+| `OPENAI_API_KEY` | Para classificação de sentimento (GPT-4o-mini) |
+| `TWITTER_BEARER_TOKEN` | X API v2 bearer token |
+| `TWITTER_UTC_HOURS` | Horas UTC para coletar Twitter (padrão: `15,18,21`) |
+
+### Deploy no Railway
+
+1. Conecte o repositório ao Railway e aponte o **root directory** para `IngestaoSentimento/`.
+2. Configure as variáveis de ambiente acima.
+3. O `railway.toml` já define o cron e o comando de entrada.
+
+---
+
 <div align="center">
 
-**o Livro Amarelo · O Futuro é Glorioso**
+**InevitávelGPT · O Futuro é Glorioso**
 
 </div>

@@ -1,17 +1,16 @@
 import Head from 'next/head';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
 import { useTurnstile } from '../hooks/useTurnstile';
 import { useDarkMode } from '../hooks/useDarkMode';
 import ShareBar from '../components/ShareBar';
 
 const FASICULOS = [
-  '/fasciculo1.png',
-  '/fasciculo2.png',
-  '/fasciculo3.png',
-  '/fasciculo4.png',
-  '/fasciculo5.png',
-  '/fasciculo6.png',
+  '/Imagem1.png',
+  '/Imagem2.png',
+  '/Imagem3.png',
+  '/Imagem4.png',
+  '/Imagem5.png',
+  '/Imagem6.png',
 ];
 
 function SunIcon() {
@@ -39,8 +38,9 @@ function MoonIcon() {
 }
 
 export default function Entry() {
-  const router = useRouter();
   const [pendingToken, setPendingToken] = useState(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState(null);
   const [dark, toggleDark] = useDarkMode();
   const [fasiculo, setFasiculo] = useState(null);
 
@@ -48,17 +48,41 @@ export default function Entry() {
     setFasiculo(FASICULOS[Math.floor(Math.random() * FASICULOS.length)]);
   }, []);
 
-  useTurnstile('turnstile-container', {
+  const { reset } = useTurnstile('turnstile-container', {
     action: 'entry',
     onToken: (token) => {
       setPendingToken(token);
+      setVerifyError(null);
     }
   });
 
-  function execute() {
+  async function execute() {
     if (!pendingToken) return;
-    sessionStorage.setItem('turnstileToken', pendingToken);
-    router.push('/inicio');
+    setVerifying(true);
+    try {
+      const res = await fetch('/api/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ turnstileToken: pendingToken }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setPendingToken(null);
+        setVerifyError(`Verificacao falhou${data.reason ? `: ${data.reason}` : ''}. Resolva o CAPTCHA novamente.`);
+        setVerifying(false);
+        reset();
+        return;
+      }
+      try {
+        sessionStorage.setItem('turnstileToken', 'ok');
+      } catch {
+      }
+      window.location.assign('/inicio');
+    } catch {
+      setVerifyError('Não foi possível verificar agora. Tente novamente.');
+      setVerifying(false);
+      reset();
+    }
   }
 
   const s = getStyles(dark);
@@ -66,7 +90,7 @@ export default function Entry() {
   return (
     <>
       <Head>
-        <title>o Livro Amarelo — O Futuro é Glorioso</title>
+        <title>InevitávelGPT — O Futuro é Glorioso</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="description" content="Explore as propostas do Livro Amarelo e as entrevistas de Renan Santos — um projeto de país para transformar o Brasil na quinta maior economia do mundo." />
         <meta property="og:type" content="website" />
@@ -107,11 +131,13 @@ export default function Entry() {
 
             <button
               onClick={execute}
-              disabled={!pendingToken}
-              style={pendingToken ? s.btnActive : s.btnDisabled}
+              disabled={!pendingToken || verifying}
+              style={pendingToken && !verifying ? s.btnActive : s.btnDisabled}
             >
-              {pendingToken ? 'Entrar →' : 'Resolva o CAPTCHA acima'}
+              {verifying ? 'Verificando...' : pendingToken ? 'Entrar' : 'Resolva o CAPTCHA acima'}
             </button>
+
+            {verifyError && <p style={s.errorText}>{verifyError}</p>}
 
             <p style={s.cardNote}>
               Apenas dados básicos e anônimos são coletados para manter a segurança e o funcionamento do site.{' '}
@@ -140,14 +166,14 @@ function getStyles(dark) {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     },
     left: {
-      background: '#EFD501',
+      background: '#FFC400',
       padding: 0,
       overflow: 'hidden',
     },
     illustration: {
       width: '100%',
       height: '100%',
-      objectFit: 'cover',
+      objectFit: 'contain',
       display: 'block',
     },
     right: {
@@ -156,8 +182,8 @@ function getStyles(dark) {
     },
     darkToggle: {
       position: 'absolute',
-      top: '20px',
-      right: '20px',
+      top: '16px',
+      right: '16px',
       background: dark ? '#2A2A2A' : '#F0F0F0',
       border: 'none',
       cursor: 'pointer',
@@ -180,28 +206,28 @@ function getStyles(dark) {
       color: text1,
       letterSpacing: '-0.03em',
       lineHeight: 1.05,
-      marginBottom: '16px',
+      marginBottom: '12px',
     },
     cardDesc: {
       color: textMuted,
       fontSize: '0.95rem',
       lineHeight: 1.6,
-      marginBottom: '28px',
+      marginBottom: '20px',
     },
     divider: {
       height: '2px',
       background: divClr,
-      marginBottom: '28px',
+      marginBottom: '20px',
     },
     turnstileWrap: {
       display: 'flex',
       justifyContent: 'flex-start',
-      marginBottom: '20px',
+      marginBottom: '16px',
       minHeight: '65px',
     },
     btnActive: {
       width: '100%',
-      padding: '16px 24px',
+      padding: '14px 24px',
       background: '#FCBF22',
       color: '#000000',
       border: '2px solid #000000',
@@ -214,7 +240,7 @@ function getStyles(dark) {
     },
     btnDisabled: {
       width: '100%',
-      padding: '16px 24px',
+      padding: '14px 24px',
       background: dark ? '#2A2A2A' : '#F2F2F2',
       color: textDim,
       border: `2px solid ${dark ? '#2A2A2A' : '#F2F2F2'}`,
@@ -228,7 +254,14 @@ function getStyles(dark) {
       color: textDim,
       fontSize: '0.75rem',
       textAlign: 'center',
-      marginTop: '14px',
+      marginTop: '12px',
+    },
+    errorText: {
+      color: '#CC0000',
+      fontSize: '0.82rem',
+      fontWeight: 600,
+      marginTop: '10px',
+      textAlign: 'center',
     },
     cardNoteLink: {
       color: dark ? '#FCBF22' : '#000000',
@@ -238,7 +271,7 @@ function getStyles(dark) {
     shareDivider: {
       height: '1px',
       background: divClr,
-      margin: '20px 0 4px',
+      margin: '16px 0 2px',
     },
   };
 }

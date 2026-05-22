@@ -3,6 +3,7 @@ import re
 import json
 import sys
 import math
+import unicodedata
 import requests
 try:
     from dotenv import load_dotenv
@@ -16,6 +17,7 @@ from openai import OpenAI
 from pinecone import Pinecone
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api.proxies import WebshareProxyConfig
+from youtube_transcript_api._transcripts import TranscriptList
 
 DATABASE_URL      = os.environ["DATABASE_URL"]
 OPENAI_API_KEY    = os.environ["OPENAI_API_KEY"]
@@ -24,10 +26,10 @@ PINECONE_INDEX    = os.environ["PINECONE_INDEX_ENTREVISTAS"]
 WEBSHARE_USERNAME = os.environ["WEBSHARE_PROXY_USERNAME"]
 WEBSHARE_PASSWORD = os.environ["WEBSHARE_PROXY_PASSWORD"]
 SYSTEM_PROMPT     = os.environ["SYSTEM_PROMPT_CURADORIA"]
-BLOCKED_YOUTUBE_CHANNEL_HANDLES = os.environ["BLOCKED_YOUTUBE_CHANNEL_HANDLES"]
+BLOCKED_YOUTUBE_CHANNEL_NAMES = os.environ["BLOCKED_YOUTUBE_CHANNEL_NAMES"]
 
 EMBEDDING_MODEL = 'text-embedding-3-large'
-CHUNK_SIZE      = 400
+CHUNK_SIZE      = 650
 UPSERT_BATCH    = 100
 SPEAKER_BLOCK   = 50
 
@@ -38,6 +40,7 @@ ytt_api = YouTubeTranscriptApi(
     proxy_config=WebshareProxyConfig(
         proxy_username=WEBSHARE_USERNAME,
         proxy_password=WEBSHARE_PASSWORD,
+        filter_ip_locations=["br", "us"],
     )
 )
 
@@ -46,27 +49,40 @@ pc             = Pinecone(api_key=PINECONE_API_KEY)
 pinecone_index = pc.Index(PINECONE_INDEX)
 
 
-def normalize_handle(handle):
-    if not handle or not isinstance(handle, str):
+def normalize_channel_name(name):
+    if not name or not isinstance(name, str):
         return None
-    trimmed = re.sub(r'^https?://(www\.)?youtube\.com/', '', handle.strip(), flags=re.IGNORECASE)
-    trimmed = trimmed.split('?', 1)[0].split('#', 1)[0].strip('/')
-    if trimmed.startswith('@'):
-        trimmed = trimmed.split('/', 1)[0]
-    with_at = trimmed if trimmed.startswith('@') else f'@{trimmed}'
-    return with_at.lower()
+    normalized = unicodedata.normalize('NFKD', name)
+    without_accents = ''.join(
+        char for char in normalized
+        if not unicodedata.combining(char)
+    )
+    return re.sub(r'\s+', ' ', without_accents).strip().lower()
 
 
-def parse_blocked_handles(value):
+def parse_blocked_channel_names(value):
     return {
         normalized
-        for normalized in (normalize_handle(part) for part in re.split(r'[\n,;]', value or ''))
+        for normalized in (normalize_channel_name(part) for part in (value or '').split(';'))
         if normalized
     }
 
 
-BLOCKED_HANDLES = parse_blocked_handles(BLOCKED_YOUTUBE_CHANNEL_HANDLES)
-print(f'Bloqueio de canais do YouTube: {len(BLOCKED_HANDLES)} handle(s) configurado(s).')
+def find_blocked_channel_term(channel_name):
+    normalized_channel = normalize_channel_name(channel_name)
+    if not normalized_channel:
+        return None
+    return next(
+        (
+            term for term in BLOCKED_CHANNEL_NAMES
+            if re.search(rf'(?<!\w){re.escape(term)}(?!\w)', normalized_channel)
+        ),
+        None,
+    )
+
+
+BLOCKED_CHANNEL_NAMES = parse_blocked_channel_names(BLOCKED_YOUTUBE_CHANNEL_NAMES)
+print(f'Bloqueio de canais do YouTube: {len(BLOCKED_CHANNEL_NAMES)} termo(s) configurado(s).')
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
@@ -76,38 +92,42 @@ def extract_video_id(url):
     return m.group(1) if m else None
 
 
-def fetch_segments(video_id):
-    """Single transcript fetch returning timestamped segments used by both curation and indexing."""
-    snippets = ytt_api.fetch(video_id, languages=['pt-BR', 'pt', 'pt-PT', 'en'])
-    return [{'text': s.text, 'offset_ms': int(s.start * 1000)} for s in snippets]
-
-
 def sanitize_field(value, max_len=200):
     if not value or not isinstance(value, str):
         return None
     return re.sub(r'[\x00-\x1F\x7F]', ' ', value).strip()[:max_len]
 
 
-def extract_channel_handle_from_html(html):
-    html = html.replace(r'\/', '/').replace(r'\u002F', '/')
-    patterns = [
-        r'"canonicalBaseUrl"\s*:\s*"\/(@[^"]+)"',
-        r'"ownerProfileUrl"\s*:\s*"https?:\/\/www\.youtube\.com\/(@[^"]+)"',
-        r'"webCommandMetadata"\s*:\s*\{[^}]*"url"\s*:\s*"\/(@[^"]+)"',
-        r'href="\/(@[^"]+)"',
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, html)
-        if match:
-            return normalize_handle(match.group(1))
-    return None
+def extract_video_metadata_from_innertube(innertube_data):
+    details = innertube_data.get('videoDetails') or {}
+    microformat = innertube_data.get('microformat', {}).get('playerMicroformatRenderer', {})
+    title = details.get('title') or microformat.get('title', {}).get('simpleText')
+    channel = details.get('author') or microformat.get('ownerChannelName')
+    published_at = microformat.get('publishDate') or microformat.get('uploadDate')
+    return {
+        'published_at': published_at,
+        'title': sanitize_field(title, 300),
+        'channel': sanitize_field(channel, 200),
+    }
 
 
-def fetch_video_channel_handle(video_id):
-    headers = {'Accept-Language': 'pt-BR,pt;q=0.9', 'User-Agent': 'Mozilla/5.0'}
-    res = requests.get(f'https://www.youtube.com/watch?v={video_id}', headers=headers, proxies=PROXIES, timeout=15)
-    res.raise_for_status()
-    return extract_channel_handle_from_html(res.text)
+def fetch_transcript_data(video_id):
+    """Single transcript and metadata fetch used by both curation and indexing."""
+    fetcher = ytt_api._fetcher
+    html = fetcher._fetch_video_html(video_id)
+    api_key = fetcher._extract_innertube_api_key(html, video_id)
+    innertube_data = fetcher._fetch_innertube_data(video_id, api_key)
+    captions_json = fetcher._extract_captions_json(innertube_data, video_id)
+    transcript_list = TranscriptList.build(fetcher._http_client, video_id, captions_json)
+    transcript = transcript_list.find_transcript(['pt-BR', 'pt', 'pt-PT', 'en'])
+    snippets = transcript.fetch()
+    segments = [{'text': s.text, 'offset_ms': int(s.start * 1000)} for s in snippets]
+    meta = extract_video_metadata_from_innertube(innertube_data)
+    # Android InnerTube context omits microformat, so publishDate is absent; fall back to HTML
+    if not meta['published_at']:
+        m = re.search(r'"publishDate"\s*:\s*"([^"]+)"', html) or re.search(r'"uploadDate"\s*:\s*"([^"]+)"', html)
+        meta['published_at'] = m.group(1).split('T')[0] if m else None
+    return segments, meta
 
 
 def reject_video(conn, vid_id, reason):
@@ -170,6 +190,20 @@ def curate(conn, video, segments):
 
 # ── Indexing ──────────────────────────────────────────────────────────────────
 
+def fetch_channel_from_oembed(video_id):
+    try:
+        res = requests.get(
+            'https://www.youtube.com/oembed',
+            params={'url': f'https://www.youtube.com/watch?v={video_id}', 'format': 'json'},
+            timeout=10,
+        )
+        if res.ok:
+            return res.json().get('author_name') or None
+    except Exception:
+        pass
+    return None
+
+
 def fetch_video_metadata(video_id):
     try:
         headers = {'Accept-Language': 'pt-BR,pt;q=0.9', 'User-Agent': 'Mozilla/5.0'}
@@ -178,13 +212,14 @@ def fetch_video_metadata(video_id):
         m_date    = re.search(r'"publishDate"\s*:\s*"([^"]+)"', html) or re.search(r'"uploadDate"\s*:\s*"([^"]+)"', html)
         m_title   = re.search(r'"title"\s*:\s*\{"runs"\s*:\s*\[\{"text"\s*:\s*"([^"]+)"', html)
         m_channel = re.search(r'"ownerChannelName"\s*:\s*"([^"]+)"', html)
+        channel   = (m_channel.group(1) if m_channel else None) or fetch_channel_from_oembed(video_id)
         return {
             'published_at': m_date.group(1).split('T')[0] if m_date else None,
             'title':        m_title.group(1) if m_title else None,
-            'channel':      m_channel.group(1) if m_channel else None,
+            'channel':      channel,
         }
     except Exception:
-        return {'published_at': None, 'title': None, 'channel': None}
+        return {'published_at': None, 'title': None, 'channel': fetch_channel_from_oembed(video_id)}
 
 
 def chunk_segments(segments, max_chars=CHUNK_SIZE):
@@ -196,7 +231,11 @@ def chunk_segments(segments, max_chars=CHUNK_SIZE):
         raw  = ' '.join(s['text'].strip() for s in segs if s['text'].strip()).strip()
         text = raw.replace('<', '&lt;').replace('>', '&gt;')
         if len(text) >= 80:
-            chunks.append({'text': text, 'startOffsetMs': segs[0]['offset_ms']})
+            chunks.append({
+                'text': text,
+                'startOffsetMs': segs[0]['offset_ms'],
+                'endOffsetMs': segs[-1]['offset_ms'],
+            })
 
     def split_buffer():
         nonlocal buffer
@@ -217,6 +256,14 @@ def chunk_segments(segments, max_chars=CHUNK_SIZE):
             split_buffer()
 
     flush(buffer)
+    for i, chunk in enumerate(chunks):
+        context_parts = []
+        if i > 0:
+            context_parts.append(chunks[i - 1]['text'])
+        context_parts.append(chunk['text'])
+        if i + 1 < len(chunks):
+            context_parts.append(chunks[i + 1]['text'])
+        chunk['contextText'] = ' '.join(context_parts)
     return chunks
 
 
@@ -255,7 +302,7 @@ def embed_batch(texts):
     return [d.embedding for d in res.data]
 
 
-def index_video(conn, video, segments):
+def index_video(conn, video, segments, meta=None):
     vid_id     = video['id']
     url        = video['url']
     individual = video.get('individual')
@@ -266,7 +313,7 @@ def index_video(conn, video, segments):
         return False
 
     print(f'[{vid_id}] Buscando metadados...')
-    meta         = fetch_video_metadata(video_id)
+    meta         = meta or fetch_video_metadata(video_id)
     published_at = meta['published_at']
     yt_title     = meta['title']
     channel      = meta['channel']
@@ -275,6 +322,10 @@ def index_video(conn, video, segments):
     if published_at: print(f'[{vid_id}] Data: {published_at}')
     if yt_title:     print(f'[{vid_id}] Título: {yt_title}')
     if channel:      print(f'[{vid_id}] Canal: {channel}')
+
+    if not title:
+        print(f'[{vid_id}] Título indisponível, pulando.')
+        return False
 
     print(f'[{vid_id}] {len(segments)} segmentos — filtrando falas de {individual or "Renan Santos"}...')
     filtered = filter_speaker_segments(segments, individual)
@@ -293,11 +344,13 @@ def index_video(conn, video, segments):
         records = []
         for j, (chunk, emb) in enumerate(zip(batch, embeddings)):
             start_seconds = math.floor(chunk['startOffsetMs'] / 1000)
+            end_seconds = math.floor(chunk.get('endOffsetMs', chunk['startOffsetMs']) / 1000)
             records.append({
                 'id':     f'yt-{video_id}-c{i + j}',
                 'values': emb,
                 'metadata': {
                     'text':          chunk['text'],
+                    'context_text':  chunk['contextText'],
                     'source':        'youtube',
                     'video_id':      video_id,
                     'url':           url,
@@ -308,6 +361,7 @@ def index_video(conn, video, segments):
                     'published_at':  published_at or '',
                     'chunk':         i + j,
                     'start_seconds': start_seconds,
+                    'end_seconds':   end_seconds,
                 },
             })
         pinecone_index.upsert(vectors=records, namespace='entrevistas')
@@ -351,24 +405,28 @@ def main():
             if not video_id:
                 print(f'[{vid_id}] URL invalida, pulando.')
                 continue
-            if BLOCKED_HANDLES:
-                try:
-                    handle = fetch_video_channel_handle(video_id)
-                    if handle in BLOCKED_HANDLES:
-                        reject_video(conn, vid_id, f'Canal bloqueado ({handle})')
-                        continue
-                except Exception as e:
-                    print(f'[{vid_id}] Nao foi possivel validar o canal do YouTube, seguindo com curadoria: {e}')
             print(f'[{vid_id}] Buscando transcrição: {video["url"]}')
             try:
-                segments = fetch_segments(video_id)
+                segments, meta = fetch_transcript_data(video_id)
             except Exception as e:
                 print(f'[{vid_id}] Transcrição indisponível, será tentado novamente: {e}')
+                continue
+            channel = meta.get('channel')
+            if not channel:
+                channel = fetch_channel_from_oembed(video_id)
+                if channel:
+                    meta = {**meta, 'channel': channel}
+                else:
+                    print(f'[{vid_id}] Nome do canal indisponivel, sera tentado novamente.')
+                    continue
+            blocked_term = find_blocked_channel_term(channel)
+            if blocked_term:
+                reject_video(conn, vid_id, f'Canal bloqueado ({channel})')
                 continue
             approved = curate(conn, video, segments)
             if approved:
                 try:
-                    index_video(conn, video, segments)
+                    index_video(conn, video, segments, meta)
                 except Exception as e:
                     print(f'[{vid_id}] Erro ao indexar: {e}')
     else:
@@ -389,12 +447,12 @@ def main():
                 continue
             print(f'[{vid_id}] Buscando transcrição: {video["url"]}')
             try:
-                segments = fetch_segments(video_id)
+                segments, meta = fetch_transcript_data(video_id)
             except Exception as e:
                 print(f'[{vid_id}] Erro ao buscar transcrição: {e}')
                 continue
             try:
-                index_video(conn, video, segments)
+                index_video(conn, video, segments, meta)
             except Exception as e:
                 print(f'[{vid_id}] Erro ao indexar: {e}')
 

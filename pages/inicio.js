@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { useTurnstile } from '../hooks/useTurnstile';
 import { useDarkMode } from '../hooks/useDarkMode';
+import { useSessionGate } from '../hooks/useSessionGate';
 import Header from '../components/Header';
 import ShareBar from '../components/ShareBar';
 
@@ -25,15 +25,9 @@ export default function QA() {
   const [rateLimitError, setRateLimitError] = useState(null);
   const [dark, toggleDark] = useDarkMode();
   const router = useRouter();
+  useSessionGate();
   const inputRef = useRef(null);
   const answerRef = useRef(null);
-
-  const { getFreshToken, activate } = useTurnstile('turnstile-container-qa', { action: 'chat', lazy: true });
-
-  // Redireciona para / se não houver token de verificação
-  if (typeof window !== 'undefined' && !sessionStorage.getItem('turnstileToken')) {
-    router.replace('/');
-  }
 
   function handleReset() {
     setQ('');
@@ -54,19 +48,10 @@ export default function QA() {
     setStreaming(false);
     setRateLimitError(null);
 
-    const freshToken = await getFreshToken();
-    if (!freshToken) {
-      setLoading(false);
-      sessionStorage.removeItem('turnstileToken');
-      alert('Verificação expirou. Você será redirecionado.');
-      router.replace('/');
-      return;
-    }
-
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: text, turnstileToken: freshToken })
+      body: JSON.stringify({ question: text })
     });
 
     if (res.status === 403) {
@@ -294,7 +279,7 @@ export default function QA() {
   return (
     <>
       <Head>
-        <title>o Livro Amarelo — Q&A</title>
+        <title>O Plano</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
       </Head>
@@ -307,12 +292,17 @@ export default function QA() {
 
           <div style={s.inputCard}>
             <label style={s.inputLabel}>Faça uma pergunta sobre os temas tratados no Livro Amarelo</label>
+            <div style={s.dataNotice}>
+              <span style={s.dataNoticeLabel}>Aviso</span>
+              <p style={s.dataNoticeText}>
+                A versão final do Livro Amarelo ainda não foi publicada. Por enquanto, a base de dados usa o plano de governo do Arthur para a prefeitura. Somente para fins de testes.
+              </p>
+            </div>
             <div className="input-row" style={s.inputRow}>
               <input
                 ref={inputRef}
                 value={q}
                 onChange={e => setQ(e.target.value)}
-                onFocus={activate}
                 onKeyDown={handleKeyDown}
                 placeholder="Ex: Quais são as propostas para a saúde?"
                 maxLength={MAX_QUESTION_LENGTH}
@@ -399,7 +389,6 @@ export default function QA() {
 
         </main>
 
-        <div id="turnstile-container-qa" style={{ display: 'none' }} />
       </div>
     </>
   );
@@ -447,6 +436,32 @@ function getStyles(dark) {
       textTransform: 'uppercase',
       letterSpacing: '0.06em',
       marginBottom: '12px',
+    },
+    dataNotice: {
+      background: dark ? '#201C12' : '#FFF7E0',
+      border: `2px solid ${dark ? '#5A4515' : '#FCBF22'}`,
+      borderRadius: '8px',
+      padding: '12px 14px',
+      marginBottom: '14px',
+    },
+    dataNoticeLabel: {
+      fontSize: '0.65rem',
+      fontWeight: 800,
+      color: dark ? '#000000' : '#000000',
+      background: '#FCBF22',
+      textTransform: 'uppercase',
+      letterSpacing: '0.08em',
+      display: 'inline-block',
+      padding: '2px 7px',
+      borderRadius: '4px',
+      marginBottom: '8px',
+    },
+    dataNoticeText: {
+      color: text2,
+      fontSize: '0.88rem',
+      lineHeight: 1.5,
+      fontWeight: 600,
+      margin: 0,
     },
     inputRow: {},
     input: {

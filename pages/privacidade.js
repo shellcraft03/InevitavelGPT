@@ -5,7 +5,6 @@ import ShareBar from '../components/ShareBar';
 
 export default function Privacidade() {
   const [dark, toggleDark] = useDarkMode();
-
   const s = getStyles(dark);
 
   return (
@@ -17,31 +16,45 @@ export default function Privacidade() {
       </Head>
 
       <div style={s.page}>
-
         <Header currentPage="privacidade" dark={dark} toggleDark={toggleDark} />
 
         <main style={s.main}>
-
           <div style={s.card}>
             <h1 style={s.title}>Política de Privacidade</h1>
             <p style={s.updated}>Atualizada em maio de 2026</p>
 
             <Section title="Dados coletados" s={s}>
-              Esta aplicação coleta apenas dados básicos e anônimos para garantir a segurança e o
-              bom funcionamento do site:
+              Esta aplicação coleta apenas dados básicos para garantir a segurança e o bom
+              funcionamento do site. O Bot X/Twitter é um recurso opcional e envolve dados
+              adicionais descritos na seção própria abaixo.
               <ul style={s.list}>
                 <li><strong>Endereço IP</strong> — usado para controle de taxa de requisições (rate limiting), prevenindo uso abusivo. Não é armazenado de forma persistente.</li>
-                <li><strong>Métricas de desempenho</strong> — tempo de carregamento e dados de performance da página, coletados pelo Vercel Speed Insights de forma agregada e anônima.</li>
+                <li><strong>Métricas de desempenho</strong> — tempo de carregamento e dados de performance da página, coletados pelo Vercel Speed Insights de forma agregada.</li>
                 <li><strong>Dados de navegação</strong> — páginas visitadas e interações, coletados pelo Google Analytics para entender o uso geral do site.</li>
                 <li><strong>Dados do dispositivo</strong> — informações técnicas do navegador coletadas pelo Cloudflare Turnstile para verificação de que o usuário é humano.</li>
               </ul>
             </Section>
 
+            <Section title="Dados do Bot X/Twitter" s={s}>
+              Caso você opte por conectar sua conta X/Twitter ao Bot, armazenamos apenas o que já é
+              público no seu perfil — exatamente o que qualquer pessoa veria ao visitar sua página na
+              plataforma:
+              <ul style={s.list}>
+                <li><strong>Identidade pública</strong> — ID da conta, @usuário, nome exibido e imagem de perfil, conforme já visíveis publicamente na X/Twitter.</li>
+                <li><strong>Status de acesso</strong> — situação do acesso ao Bot, saldo de créditos, limites e datas relacionadas.</li>
+                <li><strong>Configurações do bot</strong> — preferências que você mesmo define: ativação, limites diários e similares.</li>
+                <li><strong>Registros de execução</strong> — indicadores operacionais como horário, status de envio e contadores de uso. O conteúdo das perguntas e respostas <strong>não é armazenado</strong>.</li>
+              </ul>
+              <p style={{ marginTop: '12px' }}>
+                A autorização pode ser revogada a qualquer momento nas configurações da própria X/Twitter.
+              </p>
+            </Section>
+
             <Section title="O que não coletamos" s={s}>
-              Nenhum dado pessoal identificável (nome, e-mail, etc.) é solicitado ou coletado.
-              As perguntas que você faz <strong>não são armazenadas por este site</strong>, porém são
-              enviadas à OpenAI para processamento e podem ser retidas nos logs desse serviço, sobre
-              os quais não temos controle. Consulte a{' '}
+              Não coletamos e-mail, nome real, telefone nem qualquer dado pessoal identificável.
+              As perguntas feitas nos chats públicos <strong>não são armazenadas por este site</strong>,
+              porém são enviadas à OpenAI para processamento e podem ser retidas nos logs desse
+              serviço, sobre os quais não temos controle. Consulte a{' '}
               <a href="https://openai.com/pt/policies/privacy-policy/" target="_blank" rel="noopener noreferrer" style={s.link}>política de privacidade da OpenAI</a>{' '}
               para mais informações.
             </Section>
@@ -53,14 +66,15 @@ export default function Privacidade() {
                 <li><strong>Cloudflare Turnstile</strong> — verificação anti-bot</li>
                 <li><strong>Google Analytics</strong> — análise de uso</li>
                 <li><strong>OpenAI</strong> — processamento das perguntas via modelo de linguagem</li>
+                <li><strong>X/Twitter</strong> — autenticação OAuth e publicação de replies quando você usar o Bot X/Twitter</li>
               </ul>
               <p style={{ marginTop: '12px' }}>Cada serviço possui sua própria política de privacidade.</p>
             </Section>
 
             <Section title="Código aberto" s={s}>
-              Todo o código deste site é aberto sob licença MIT.{' '}
+              Todo o código deste site é aberto sob licença MIT, podendo ser auditado a qualquer momento, por qualquer um.{' '}
               <a
-                href="https://github.com/EliasBarbosa0/livro-amarelo"
+                href="https://github.com/shellcraft03/livro-amarelo"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={s.linkBtn}
@@ -71,11 +85,9 @@ export default function Privacidade() {
                 Ver no GitHub
               </a>
             </Section>
-
           </div>
 
           <ShareBar />
-
         </main>
       </div>
     </>
@@ -92,12 +104,12 @@ function Section({ title, children, s }) {
 }
 
 function getStyles(dark) {
-  const pageBg  = dark ? '#111111' : '#F2F2F2';
-  const cardBg  = dark ? '#1A1A1A' : '#FFFFFF';
+  const pageBg = dark ? '#111111' : '#F2F2F2';
+  const cardBg = dark ? '#1A1A1A' : '#FFFFFF';
   const cardBdr = dark ? '#333333' : '#000000';
-  const text1   = dark ? '#EEEEEE' : '#000000';
+  const text1 = dark ? '#EEEEEE' : '#000000';
   const textBody = dark ? '#CCCCCC' : '#333333';
-  const textDim  = dark ? '#888888' : '#666666';
+  const textDim = dark ? '#888888' : '#666666';
 
   return {
     page: {
@@ -130,7 +142,7 @@ function getStyles(dark) {
       fontSize: 'clamp(1.6rem, 4vw, 2.2rem)',
       fontWeight: 900,
       color: text1,
-      letterSpacing: '-0.03em',
+      letterSpacing: 0,
       lineHeight: 1.1,
       marginBottom: '4px',
     },
