@@ -58,7 +58,7 @@ function DonationBanner({ dark, onDismiss }) {
     <div style={{
       position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 500,
       background: bg, borderTop: '2px solid #FCBF22',
-      padding: '10px 16px', display: 'flex', alignItems: 'center',
+      padding: '10px 16px 10px 24px', display: 'flex', alignItems: 'center',
       justifyContent: 'center', gap: '12px', flexWrap: 'wrap',
     }}>
       <span style={{ color: text, flex: 1, minWidth: '200px', fontSize: '0.8rem', lineHeight: 1.4 }}>
