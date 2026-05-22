@@ -119,7 +119,7 @@ export default function Doacoes() {
 
             <Section title="Privacidade e dados pessoais" s={s}>
               Em nenhuma das duas formas de doação o Livepix repassa dados pessoais do doador a este
-              projeto. O processamento do Pix é feito integralmente pelo Livepix, e este site não
+              projeto. O processamento do Pix é feito integralmente pelo Livepix. O InevitávelGPT não
               tem acesso ao seu nome, CPF, e-mail ou qualquer dado bancário.
               <p style={{ marginTop: '12px' }}>
                 Ao usar a opção do Bot X/Twitter, armazenamos apenas informações já públicas no
