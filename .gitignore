@@ -25,3 +25,4 @@ BotTwitter2/**/.venv/
 IngestaoSentimento/**/.env
 IngestaoSentimento/.venv/
 twitter-beta.md
+IngestaoSentimento/.pytest_cache/
