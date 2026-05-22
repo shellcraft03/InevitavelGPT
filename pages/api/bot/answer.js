@@ -1,33 +1,43 @@
 import OpenAI from 'openai';
-import { queryEmbeddingInNamespace } from '../../../lib/vectorStore.js';
+import { sanitizeQuestion, cleanRetrievalQuery } from '../../../lib/chat-utils.js';
+import { retrieveChunks } from '../../../lib/rag.js';
+import { LIVRO_TOPIC_EXPANSIONS, LIVRO_STOPWORDS, ENTREVISTAS_TOPIC_EXPANSIONS, ENTREVISTAS_STOPWORDS } from '../../../lib/rag-domains.js';
 
 const EMBEDDING_MODEL = 'text-embedding-3-large';
 const QUERY_REWRITE_MODEL = process.env.QUERY_REWRITE_MODEL || 'gpt-4.1-nano';
 const CHAT_MODEL = 'gpt-4.1';
 const INITIAL_TOP_K = 20;
+const RERANK_CANDIDATES = 20;
 const FINAL_CHUNKS = 8;
 const MAX_TOKENS = 800;
 
 const client = new OpenAI({ apiKey: process.env.CUSTOM_OPENAI_API_KEY || process.env.OPENAI_API_KEY });
 
-function cleanQuery(text) {
-  return String(text || '')
-    .normalize('NFKC')
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-    .replace(/[{}[\]"]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 1200);
-}
+const RERANK_PROMPTS = {
+  livro: [
+    'Voce reranqueia trechos do Livro Amarelo para responder uma pergunta.',
+    'Use apenas a relevancia dos trechos para a pergunta.',
+    'Prefira trechos que respondem diretamente, com detalhes concretos.',
+    'Retorne somente um array JSON com os ids dos trechos mais relevantes em ordem.',
+    `Retorne no maximo ${FINAL_CHUNKS} ids.`,
+  ].join(' '),
+  entrevistas: [
+    'Voce reranqueia trechos de entrevistas para responder uma pergunta.',
+    'Use apenas a relevancia dos trechos para a pergunta.',
+    'Prefira trechos que respondem diretamente, com detalhes concretos.',
+    'Retorne somente um array JSON com os ids dos trechos mais relevantes em ordem.',
+    `Retorne no maximo ${FINAL_CHUNKS} ids.`,
+  ].join(' '),
+};
 
-function sanitizeQuestion(raw) {
-  return raw
-    .toString()
-    .normalize('NFKC')
-    .trim()
-    .slice(0, 500)
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-    .replace(/[^a-zA-ZÀ-ú0-9\s.,!?;:()\-'"/%\n]/g, '');
+function buildRerankItem(match, index, type) {
+  const base = {
+    id: match.id || String(index),
+    title: match.meta?.title || (type === 'livro' ? match.meta?.file : '') || '',
+    text: String(match.text || '').slice(0, 250),
+  };
+  if (type === 'livro') return { ...base, page: match.meta?.page ?? null };
+  return { ...base, time: match.meta?.start_seconds ?? null };
 }
 
 async function rewriteQuery(question, promptEnvKey) {
@@ -43,67 +53,10 @@ async function rewriteQuery(question, promptEnvKey) {
         { role: 'user', content: question },
       ],
     });
-    return cleanQuery(res.choices?.[0]?.message?.content) || question;
+    return cleanRetrievalQuery(res.choices?.[0]?.message?.content) || question;
   } catch {
     return question;
   }
-}
-
-function normalizeText(text) {
-  return String(text || '')
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase();
-}
-
-function rankMatches(matches, question) {
-  const terms = normalizeText(question)
-    .split(/[^a-z0-9]+/)
-    .map(t => t.trim())
-    .filter(t => t.length >= 4);
-
-  return matches
-    .map(match => {
-      const haystack = normalizeText(`${match.meta?.title || ''} ${match.text || ''}`);
-      const hits = terms.reduce((s, t) => s + (haystack.includes(t) ? 1 : 0), 0);
-      const coverage = terms.length > 0 ? hits / terms.length : 0;
-      const titleHits = terms.reduce((s, t) => s + (normalizeText(match.meta?.title).includes(t) ? 1 : 0), 0);
-      return {
-        ...match,
-        rerankScore: (match.score || 0) + coverage * 0.12 + titleHits * 0.02 - (terms.length > 0 && hits === 0 ? 0.04 : 0),
-      };
-    })
-    .sort((a, b) => b.rerankScore - a.rerankScore);
-}
-
-async function retrieveChunks(question, namespace, rewritePromptKey) {
-  const origEmbPromise = client.embeddings.create({ model: EMBEDDING_MODEL, input: [question] });
-  const rewritePromise = rewriteQuery(question, rewritePromptKey);
-
-  const origEmbRes = await origEmbPromise;
-  const origEmbedding = origEmbRes?.data?.[0]?.embedding;
-  const origSearch = origEmbedding
-    ? queryEmbeddingInNamespace(origEmbedding, namespace, INITIAL_TOP_K)
-    : Promise.resolve([]);
-
-  const rewritten = await rewritePromise;
-  let rewriteSearch = Promise.resolve([]);
-  if (rewritten && rewritten !== question) {
-    const rwRes = await client.embeddings.create({ model: EMBEDDING_MODEL, input: [rewritten] });
-    const rwEmbedding = rwRes?.data?.[0]?.embedding;
-    if (rwEmbedding) {
-      rewriteSearch = queryEmbeddingInNamespace(rwEmbedding, namespace, INITIAL_TOP_K);
-    }
-  }
-
-  const [r1, r2] = await Promise.all([origSearch, rewriteSearch]);
-  const byId = new Map();
-  for (const m of [...r1, ...r2]) {
-    const cur = byId.get(m.id);
-    if (!cur || (m.score || 0) > (cur.score || 0)) byId.set(m.id, m);
-  }
-
-  return rankMatches([...byId.values()], question).slice(0, FINAL_CHUNKS);
 }
 
 function buildContext(chunks, type) {
@@ -141,6 +94,9 @@ export default async function handler(req, res) {
   const isLivro = type === 'livro';
   const namespace = isLivro ? 'livro-amarelo-v2' : 'entrevistas';
   const rewritePromptKey = isLivro ? 'SYSTEM_PROMPT_QUERY_REWRITE_LIVRO' : 'SYSTEM_PROMPT_QUERY_REWRITE_ENTREVISTAS';
+  const rerankModel = isLivro
+    ? (process.env.LIVRO_RERANK_MODEL || 'gpt-4.1-nano')
+    : (process.env.INTERVIEW_RERANK_MODEL || 'gpt-4.1-nano');
   const systemPromptKey = isLivro ? 'SYSTEM_PROMPT_LIVRO' : 'SYSTEM_PROMPT_ENTREVISTAS';
   const systemPrompt = process.env[systemPromptKey];
 
@@ -149,9 +105,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    const chunks = await retrieveChunks(question, namespace, rewritePromptKey);
-    const contextText = buildContext(chunks, type);
+    const { chunks } = await retrieveChunks(client, question, {
+      namespace,
+      embeddingModel: EMBEDDING_MODEL,
+      initialTopK: INITIAL_TOP_K,
+      rerankCandidates: RERANK_CANDIDATES,
+      finalChunks: FINAL_CHUNKS,
+      rerankModel,
+      rerankSystemPrompt: RERANK_PROMPTS[type],
+      buildRerankItem: (match, index) => buildRerankItem(match, index, type),
+      rewriteQueryFn: (q) => rewriteQuery(q, rewritePromptKey),
+      topicExpansions: isLivro ? LIVRO_TOPIC_EXPANSIONS : ENTREVISTAS_TOPIC_EXPANSIONS,
+      stopwords: isLivro ? LIVRO_STOPWORDS : ENTREVISTAS_STOPWORDS,
+      label: `bot/${type}`,
+    });
 
+    const contextText = buildContext(chunks, type);
     const messages = [
       { role: 'system', content: systemPrompt },
       {
