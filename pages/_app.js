@@ -1,8 +1,11 @@
 import NextApp from 'next/app';
 import Script from 'next/script';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import '../styles/globals.css';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
+import { useDarkMode } from '../hooks/useDarkMode';
 
 const GA_ID = 'G-N3437C3V4E';
 
@@ -46,8 +49,73 @@ function PullIndicator({ pullY, refreshing, threshold }) {
   );
 }
 
+function DonationBanner({ dark, onDismiss }) {
+  const bg      = dark ? '#1e1a0e' : '#fffbef';
+  const text    = dark ? '#f0de8a' : '#78350f';
+  const muted   = dark ? '#a89550' : '#92400e';
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 500,
+      background: bg, borderTop: '2px solid #FCBF22',
+      padding: '10px 16px', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', gap: '12px', flexWrap: 'wrap',
+    }}>
+      <span style={{ color: text, flex: 1, minWidth: '200px', fontSize: '0.8rem', lineHeight: 1.4 }}>
+        Apoie o projeto.{' '}
+        <span style={{ color: muted }}>
+          Doações por aqui não dão créditos para o Bot X/Twitter — para obter créditos, acesse{' '}
+          <a href="/inevitavelgpt2" style={{ color: '#FCBF22', fontWeight: 700, textDecoration: 'none' }}>
+            Bot X/Twitter
+          </a>.
+        </span>
+      </span>
+      <a
+        href="https://livepix.gg/inevitavelbot"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          background: '#FCBF22', color: '#000', fontWeight: 700,
+          fontSize: '0.8rem', padding: '6px 14px', borderRadius: '6px',
+          textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0,
+        }}
+      >
+        Apoiar ↗
+      </a>
+      <button
+        onClick={onDismiss}
+        aria-label="Fechar"
+        style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: muted, fontSize: '1.2rem', lineHeight: 1,
+          padding: '0 4px', flexShrink: 0,
+        }}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 export default function App({ Component, pageProps, nonce }) {
   const { pullY, refreshing, threshold } = usePullToRefresh();
+  const [dark] = useDarkMode();
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const router = useRouter();
+  const showBanner = !bannerDismissed
+    && router.pathname !== '/'
+    && !router.pathname.startsWith('/inevitavelgpt2');
+
+  useEffect(() => {
+    if (sessionStorage.getItem('donationBannerDismissed') === 'true') {
+      setBannerDismissed(true);
+    }
+  }, []);
+
+  function dismissBanner() {
+    sessionStorage.setItem('donationBannerDismissed', 'true');
+    setBannerDismissed(true);
+  }
 
   return (
     <>
@@ -66,6 +134,8 @@ export default function App({ Component, pageProps, nonce }) {
       </Script>
       <PullIndicator pullY={pullY} refreshing={refreshing} threshold={threshold} />
       <Component {...pageProps} />
+      {showBanner && <div style={{ height: '56px' }} aria-hidden="true" />}
+      {showBanner && <DonationBanner dark={dark} onDismiss={dismissBanner} />}
       <SpeedInsights />
     </>
   );
