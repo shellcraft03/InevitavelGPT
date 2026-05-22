@@ -101,15 +101,25 @@ export default function App({ Component, pageProps, nonce }) {
   const { pullY, refreshing, threshold } = usePullToRefresh();
   const [dark] = useDarkMode();
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [bannerSuppressed, setBannerSuppressed] = useState(null);
   const router = useRouter();
   const showBanner = !bannerDismissed
+    && bannerSuppressed === false
     && router.pathname !== '/'
     && !router.pathname.startsWith('/inevitavelgpt2');
 
   useEffect(() => {
     if (sessionStorage.getItem('donationBannerDismissed') === 'true') {
       setBannerDismissed(true);
+      setBannerSuppressed(false);
+      return;
     }
+    fetch('/api/inevitavelgpt2/me')
+      .then(r => r.json())
+      .then(data => {
+        setBannerSuppressed(data.authenticated && (data.user?.credit_balance_cents ?? 0) >= 1000);
+      })
+      .catch(() => setBannerSuppressed(false));
   }, []);
 
   function dismissBanner() {
