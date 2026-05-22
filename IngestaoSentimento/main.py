@@ -12,7 +12,7 @@ from coleta.db import (ensure_tables, upsert_sentiment, insert_noticias,
                         insert_tweets, compute_twitter_sentiment,
                         clear_rss_today)
 from coleta.rss import fetch_rss
-from coleta.classifier import classify_texts, classify_texts_individual
+from coleta.classifier import classify_texts_individual
 from coleta.twitter import fetch_twitter
 from coleta.polymarket import fetch_polymarket
 
@@ -81,27 +81,32 @@ def main():
                 ]
                 log.info(f"RSS: {len(ordered)} coletados, {len(new_articles)} novos, {len(ordered) - len(new_articles)} já avaliados")
 
-                if new_articles:
-                    # Classify only new articles, per candidate
+                try:
+                    if new_articles:
+                        # Classify only new articles, per candidate
+                        for c in CANDIDATES:
+                            relevant = [a for a in new_articles if c["slug"] in a["relevante_para"]]
+                            if not relevant:
+                                continue
+                            texts = [a["text"] for a in relevant]
+                            sentiments = classify_texts_individual(texts, c["nome"], c.get("contexto", ""))
+                            for article, sentiment in zip(relevant, sentiments):
+                                article["classifications"][c["slug"]] = sentiment
+
+                        insert_noticias(conn, today, new_articles)
+
+                    # Recompute RSS sentiment from all articles stored for today
+                    daily = compute_rss_sentiment(conn, today)
                     for c in CANDIDATES:
-                        relevant = [a for a in new_articles if c["slug"] in a["relevante_para"]]
-                        if not relevant:
-                            continue
-                        texts = [a["text"] for a in relevant]
-                        sentiments = classify_texts_individual(texts, c["nome"], c.get("contexto", ""))
-                        for article, sentiment in zip(relevant, sentiments):
-                            article["classifications"][c["slug"]] = sentiment
-
-                    insert_noticias(conn, today, new_articles)
-
-                # Recompute RSS sentiment from all articles stored for today
-                daily = compute_rss_sentiment(conn, today)
-                for c in CANDIDATES:
-                    t = daily.get(c["slug"])
-                    if t and t["total"] > 0:
-                        upsert_sentiment(conn, c["slug"], "rss", today,
-                                         t["pos"], t["neu"], t["neg"], t["total"])
-                        log.info(f"RSS {c['slug']}: +{t['pos']} ~{t['neu']} -{t['neg']} / {t['total']}")
+                        t = daily.get(c["slug"])
+                        if t and t["total"] > 0:
+                            upsert_sentiment(conn, c["slug"], "rss", today,
+                                             t["pos"], t["neu"], t["neg"], t["total"])
+                            log.info(f"RSS {c['slug']}: +{t['pos']} ~{t['neu']} -{t['neg']} / {t['total']}")
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+                    raise
 
         # ── Twitter ──────────────────────────────────────────────────────────
         if not run_twitter:
@@ -109,38 +114,48 @@ def main():
         else:
             cursors = {} if "--no-cursor" in sys.argv else get_twitter_cursors(conn)
             twitter_data, new_cursors = fetch_twitter(cursors)
-            for c in CANDIDATES:
-                items = twitter_data[c["slug"]]  # list of {tweet_id, texto}
-                if items:
-                    texts = [it["texto"] for it in items]
-                    sentiments = classify_texts_individual(texts, c["nome"], c.get("contexto", ""))
-                    for item, sentiment in zip(items, sentiments):
-                        item["sentimento"] = sentiment
-                    insert_tweets(conn, today, c["slug"], items)
-                    if c["slug"] in new_cursors:
-                        save_twitter_cursor(conn, c["slug"], new_cursors[c["slug"]])
-                    log.info(f"Twitter {c['slug']}: {len(items)} tweets novos salvos")
-                else:
-                    log.info(f"Twitter {c['slug']}: nenhum tweet novo desde o último cursor")
+            try:
+                for c in CANDIDATES:
+                    items = twitter_data[c["slug"]]  # list of {tweet_id, texto}
+                    if items:
+                        texts = [it["texto"] for it in items]
+                        sentiments = classify_texts_individual(texts, c["nome"], c.get("contexto", ""))
+                        for item, sentiment in zip(items, sentiments):
+                            item["sentimento"] = sentiment
+                        insert_tweets(conn, today, c["slug"], items)
+                        if c["slug"] in new_cursors:
+                            save_twitter_cursor(conn, c["slug"], new_cursors[c["slug"]])
+                        log.info(f"Twitter {c['slug']}: {len(items)} tweets novos salvos")
+                    else:
+                        log.info(f"Twitter {c['slug']}: nenhum tweet novo desde o último cursor")
 
-            # Recompute Twitter sentiment from all stored tweets for today
-            daily_tw = compute_twitter_sentiment(conn, today)
-            for c in CANDIDATES:
-                t = daily_tw.get(c["slug"])
-                if t and t["total"] > 0:
-                    upsert_sentiment(conn, c["slug"], "twitter", today,
-                                     t["pos"], t["neu"], t["neg"], t["total"])
-                    log.info(f"Twitter {c['slug']}: total dia +{t['pos']} ~{t['neu']} -{t['neg']} / {t['total']}")
+                # Recompute Twitter sentiment from all stored tweets for today
+                daily_tw = compute_twitter_sentiment(conn, today)
+                for c in CANDIDATES:
+                    t = daily_tw.get(c["slug"])
+                    if t and t["total"] > 0:
+                        upsert_sentiment(conn, c["slug"], "twitter", today,
+                                         t["pos"], t["neu"], t["neg"], t["total"])
+                        log.info(f"Twitter {c['slug']}: total dia +{t['pos']} ~{t['neu']} -{t['neg']} / {t['total']}")
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
 
         # ── Polymarket ───────────────────────────────────────────────────────
         if not twitter_only:
             pm = fetch_polymarket()
             if pm:
-                for c in CANDIDATES:
-                    odds = pm.get(c["slug"])
-                    if odds is not None:
-                        upsert_sentiment(conn, c["slug"], "polymarket", today,
-                                         0, 0, 0, 0, odds=odds)
+                try:
+                    for c in CANDIDATES:
+                        odds = pm.get(c["slug"])
+                        if odds is not None:
+                            upsert_sentiment(conn, c["slug"], "polymarket", today,
+                                             0, 0, 0, 0, odds=odds)
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+                    raise
 
         log.info("Done.")
     finally:
