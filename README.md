@@ -438,12 +438,9 @@ cursor global atualizado em igpt2_global_settings (bot_mentions_since_id)
 | Variável | Descrição |
 |---|---|
 | `DATABASE_URL` | URL do Neon usado pelo site e pelo worker |
-| `X_CLIENT_ID` | Client ID do app X/Twitter OAuth 2.0 |
-| `X_CLIENT_SECRET` | Client Secret do app X/Twitter OAuth 2.0, quando aplicável |
 | `BOT_API_URL` | URL de `/api/bot/answer` na Vercel ou localmente (ex.: `https://www.inevitavelgpt.com/api/bot/answer`) |
 | `BOT_API_SECRET` | Mesmo valor de `BOT_API_SECRET` configurado na Vercel |
 | `INEVITAVEL_GPT_KEYWORD` | Palavra-chave obrigatória no tweet (ex.: `GPT`); sem padrão |
-| `IGPT2_BOT_HANDLE` | Handle do bot que publica as respostas (ex.: `@Inevitavel_Bot`); obrigatório |
 | `BOT_CONSUMER_KEY` | API Key do app X/Twitter do bot (OAuth 1.0a) |
 | `BOT_CONSUMER_SECRET` | API Key Secret do app X/Twitter do bot (OAuth 1.0a) |
 | `BOT_ACCESS_TOKEN` | Access Token do perfil @Inevitavel_Bot (OAuth 1.0a) |
