@@ -109,13 +109,16 @@ livro-amarelo/
 │           └── webhook.js           # Receives payment confirmation and credits user balance
 ├── hooks/
 │   ├── useTurnstile.js              # React hook for the Turnstile widget
-│   └── useSessionGate.js            # React hook to verify session via cookie and redirect if invalid
+│   ├── useSessionGate.js            # React hook to verify session via cookie and redirect if invalid
+│   ├── useDarkMode.js               # React hook for dark mode (default: on; persisted in localStorage)
+│   └── usePullToRefresh.js          # React hook for pull-to-refresh on mobile devices
 ├── lib/
 │   ├── turnstile.js                 # Server-side token verification
 │   ├── session.js                   # HMAC-SHA256 session cookie generation and validation
 │   ├── chunker.js                   # Text splitting and normalization (PDF)
 │   ├── vectorStore.js               # Embedding storage and search (Pinecone)
 │   └── rateLimiter.js               # IP-based rate limiting (shared across endpoints)
+├── proxy.js                         # Next.js middleware: per-request nonce-based CSP; injects x-nonce header for _document and GA
 ├── curar-indexar.bat                # Interactive local menu for video management (curation + indexing)
 ├── scripts/
 │   ├── process_videos_ci.py         # CI: curation + indexing in a single pass (Python); blocks configured channels; prefers BR → US proxies
