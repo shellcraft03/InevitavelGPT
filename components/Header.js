@@ -10,6 +10,7 @@ const PAGES = [
   { href: '/renan-santos-responde',   label: 'Renan Responde' },
   { href: '/sentimento',              label: 'Eleições 2026'  },
   { href: '/inevitavelgpt2',          label: 'Bot X/Twitter'  },
+  { href: '/doacoes',                 label: 'Apoie'          },
   { href: '/sobre',                   label: 'Sobre'          },
   { href: '/privacidade',             label: 'Privacidade'    },
 ];

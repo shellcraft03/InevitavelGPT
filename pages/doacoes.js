@@ -87,7 +87,7 @@ export default function Doacoes() {
             <table style={s.table}>
                 <thead>
                   <tr>
-                    <th style={s.th}>Diferenças entre as opções</th>
+                    <th style={s.th}>Diferenças</th>
                     <th style={{ ...s.th, textAlign: 'center' }}>Doação Direta</th>
                     <th style={{ ...s.th, textAlign: 'center' }}>Bot X/Twitter</th>
                   </tr>
