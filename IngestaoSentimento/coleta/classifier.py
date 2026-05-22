@@ -1,10 +1,15 @@
 import os
+import re
 import json
 import logging
 from openai import OpenAI
 
 log = logging.getLogger(__name__)
-client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"], max_retries=4, timeout=30.0)
+
+
+def _safe_label(text):
+    return re.sub(r'[\r\n\x00-\x1f]', ' ', str(text)).strip()[:100]
 
 
 def classify_texts_individual(texts, candidate_nome, candidate_contexto=""):
@@ -15,10 +20,12 @@ def classify_texts_individual(texts, candidate_nome, candidate_contexto=""):
 
     results = []
     batch_size = 20
+    nome = _safe_label(candidate_nome)
+    ctx = _safe_label(candidate_contexto)
     prompt_prefix = (
         f"Você é um analista político. Classifique cada texto abaixo como positivo, neutro ou negativo "
-        f"em relação ao candidato {candidate_nome}"
-        + (f" ({candidate_contexto})" if candidate_contexto else "")
+        f"em relação ao candidato {nome}"
+        + (f" ({ctx})" if ctx else "")
         + f", do ponto de vista da imagem e da campanha política do candidato.\n\n"
         f"POSITIVO: elogio direto, declaração de voto, apoio, crescimento nas pesquisas/mercados, "
         f"ataque bem-sucedido a rival, rival perdendo espaço, defesa do candidato contra críticas, "
@@ -27,14 +34,14 @@ def classify_texts_individual(texts, candidate_nome, candidate_contexto=""):
         f"queda nas pesquisas, piada ou meme que ridiculariza o candidato, ataque de adversários sem resposta.\n"
         f"NEUTRO: menção puramente informativa sem tom, agenda de evento, citação de frase sem contexto "
         f"avaliativo, ou texto sobre outro assunto que apenas cita o nome.\n\n"
-        f"ATENÇÃO: quando o próprio {candidate_nome} usa linguagem negativa para descrever RIVAIS "
+        f"ATENÇÃO: quando o próprio {nome} usa linguagem negativa para descrever RIVAIS "
         f"(compara adversários a doenças, desastres, problemas), isso é POSITIVO — o candidato está "
         f"se posicionando como alternativa melhor, não sendo atacado.\n\n"
-        f"Exemplos POSITIVO: 'vou votar em {candidate_nome}', '{candidate_nome} sobe nas pesquisas', "
-        f"'rival despenca e {candidate_nome} se aproxima', '{candidate_nome} detona adversário em debate', "
-        f"'{candidate_nome} diz que escolher entre rivais é como escolher entre duas tragédias'\n"
-        f"Exemplos NEGATIVO: '{candidate_nome} envolvido em polêmica', '{candidate_nome} perde apoio', "
-        f"'pesquisa mostra queda de {candidate_nome}'\n\n"
+        f"Exemplos POSITIVO: 'vou votar em {nome}', '{nome} sobe nas pesquisas', "
+        f"'rival despenca e {nome} se aproxima', '{nome} detona adversário em debate', "
+        f"'{nome} diz que escolher entre rivais é como escolher entre duas tragédias'\n"
+        f"Exemplos NEGATIVO: '{nome} envolvido em polêmica', '{nome} perde apoio', "
+        f"'pesquisa mostra queda de {nome}'\n\n"
         f"Responda APENAS com JSON: "
         f'{{\"c\": [\"positivo\",\"neutro\",\"negativo\",...]}}\n\n'
     )
@@ -58,8 +65,11 @@ def classify_texts_individual(texts, candidate_nome, candidate_contexto=""):
                     results.append("negativo")
                 else:
                     results.append("neutro")
+            while len(results) < i + len(batch):
+                results.append("neutro")
         except Exception as e:
             log.warning(f"classify {candidate_nome}: {e}")
+            results.extend(["neutro"] * (i + len(batch) - len(results)))
 
     return results
 
