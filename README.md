@@ -117,7 +117,10 @@ livro-amarelo/
 │   ├── session.js                   # Geração e validação de cookie de sessão HMAC-SHA256
 │   ├── chunker.js                   # Divisão e normalização de texto (PDF)
 │   ├── vectorStore.js               # Armazenamento e busca de embeddings (Pinecone)
-│   └── rateLimiter.js               # Rate limiting por IP (compartilhado entre endpoints)
+│   ├── rateLimiter.js               # Rate limiting por IP (compartilhado entre endpoints)
+│   ├── chat-utils.js                # Utilitários compartilhados: sanitize, normaliza, intFromEnv, getIp, parseRankedIds, defaults RAG
+│   ├── rag.js                       # Pipeline RAG compartilhado: guard de requisição, lexical rank, LLM rerank, retrieve, SSE, streaming
+│   └── rag-domains.js               # Expansões de tópico e stopwords por domínio (livro e entrevistas)
 ├── proxy.js                         # Middleware Next.js: CSP nonce-based por requisição; injeta header x-nonce para _document e GA
 ├── curar-indexar.bat                # Menu interativo local para gestão de vídeos (curadoria + indexação)
 ├── scripts/
@@ -147,16 +150,30 @@ livro-amarelo/
 │   ├── Procfile                     # worker: python main.py
 │   ├── runtime.txt                  # python-3.11
 │   ├── requirements.txt
+│   ├── conftest.py                  # fixtures pytest: env vars para testes sem credenciais reais
 │   ├── main.py                      # loop principal do worker
 │   ├── run-local-worker.bat          # carrega .env local e executa o worker no Windows
+│   ├── tests/
+│   │   └── test_worker.py           # testes de _parse_tweet, _strip_accents e _error_code
 │   └── InevitavelGPT2/
 │       ├── api.py                   # chama /api/bot/answer e /api/bot/image
 │       ├── db.py                    # conexão Neon
 │       ├── worker.py                # orquestração multiusuário
 │       └── x_api.py                 # leitura de menções, upload de mídia e reply
+├── __tests__/
+│   └── lib/
+│       ├── chat-utils.test.js       # testes de sanitize, normaliza, intFromEnv, getIp, parseRankedIds
+│       ├── session.test.js          # testes de cookie HMAC-SHA256 (emissão, validação, expiração, tamper)
+│       ├── turnstile.test.js        # testes de verifyTurnstile (mocks de fetch)
+│       ├── rateLimiter.test.js      # testes do fallback em memória (minute + daily limit)
+│       └── rag.test.js              # testes de buildTopicTerms, lexicalRank, llmRerankChunks e setupSse
 └── IngestaoSentimento/              # Worker Python — rastreador de sentimento eleitoral (Railway)
     ├── railway.toml                 # cron horário; startCommand = python main.py
+    ├── conftest.py                  # fixtures pytest: env vars para testes sem credenciais reais
     ├── main.py                      # orquestrador: RSS + Twitter + Polymarket
+    ├── tests/
+    │   ├── test_classifier.py       # testes de classify_texts_individual (labels, batching, padding)
+    │   └── test_main.py             # testes de _run_twitter_now (flags e horários UTC)
     └── coleta/
         ├── config.py                # candidatos e fontes RSS permitidas
         ├── classifier.py            # classify_texts_individual via OpenAI
@@ -439,6 +456,7 @@ cursor global atualizado em igpt2_global_settings (bot_mentions_since_id)
 
 | Comando | Descrição |
 |---|---|
+| `npm test` | Executa a suite de testes Jest (`__tests__/`) |
 | `npm run dev` | Servidor de desenvolvimento na porta 3000 |
 | `npm run build` | Build de produção |
 | `npm start` | Servidor de produção |
