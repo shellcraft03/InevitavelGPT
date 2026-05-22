@@ -57,7 +57,7 @@ This web application allows users to explore the content of O Livro Amarelo and 
 | Embeddings | OpenAI text-embedding-3-large (book and interviews) |
 | Vector store | Pinecone — namespace `livro-amarelo-v2` (book) and `entrevistas` (YouTube) |
 | Relational DB | Neon Postgres (serverless) |
-| YouTube transcription | youtube-transcript-api (Python, CI) · youtube-transcript (Node, local) |
+| YouTube transcription | youtube-transcript-api (Python, CI and local via `fetch_transcript.py`) |
 | CAPTCHA | Cloudflare Turnstile |
 | Rate limit | @upstash/ratelimit · Sliding Window · Upstash Redis (serverless) · in-memory fallback (local dev) |
 | Analytics | Google Analytics 4 |
@@ -88,6 +88,7 @@ livro-amarelo/
 │   ├── sentimento.js                # 2026 election sentiment tracker
 │   ├── metodologia-sentimento.js    # Scoring methodology (with live calculation demo)
 │   ├── noticias-sentimento.js       # Daily news with sentiment classifications
+│   ├── doacoes.js                   # Donations page ("Apoie") — public, no session protection
 │   ├── sobre.js                     # About page
 │   ├── privacidade.js               # Privacy policy
 │   ├── _app.js                      # App wrapper — global CSS + Google Analytics
@@ -126,6 +127,7 @@ livro-amarelo/
 ├── scripts/
 │   ├── process_videos_ci.py         # CI: curation + indexing in a single pass (Python); blocks configured channels; prefers BR → US proxies
 │   ├── migrate_videos.mjs           # Create/update videos table in Neon
+│   ├── fetch_transcript.py          # Python helper for local transcription: youtube-transcript-api + Webshare proxy; called by curate_videos.mjs and index_youtube.mjs via spawnSync
 │   ├── curate_videos.mjs            # Curate pending videos via GPT-4.1-mini (local use)
 │   ├── index_youtube.mjs            # Transcription, speaker filter, chunking, embeddings → Pinecone (local use)
 │   ├── manage_videos.mjs            # Manual management: list, approve, reject and reset videos
@@ -220,7 +222,7 @@ UPSTASH_REDIS_REST_TOKEN=...
 # Neon Postgres
 DATABASE_URL=postgresql://...
 
-# Webshare (proxy for YouTube Transcript API — required for the Python CI script)
+# Webshare (proxy for YouTube Transcript API — required for CI and local scripts)
 WEBSHARE_PROXY_USERNAME=...
 WEBSHARE_PROXY_PASSWORD=...
 
