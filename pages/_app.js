@@ -64,23 +64,18 @@ function DonationBanner({ dark, onDismiss }) {
       <span style={{ color: text, flex: 1, minWidth: '200px', fontSize: '0.8rem', lineHeight: 1.4 }}>
         Apoie o projeto.{' '}
         <span style={{ color: muted }}>
-          Doações por aqui não dão créditos para o Bot X/Twitter — para obter créditos, acesse{' '}
-          <a href="/inevitavelgpt2" style={{ color: '#FCBF22', fontWeight: 700, textDecoration: 'none' }}>
-            Bot X/Twitter
-          </a>.
+          O acesso é gratuito — doações ajudam a manter o site no ar.
         </span>
       </span>
       <a
-        href="https://livepix.gg/inevitavelbot"
-        target="_blank"
-        rel="noopener noreferrer"
+        href="/doacoes"
         style={{
           background: '#FCBF22', color: '#000', fontWeight: 700,
           fontSize: '0.8rem', padding: '6px 14px', borderRadius: '6px',
           textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0,
         }}
       >
-        Apoiar ↗
+        Como apoiar →
       </a>
       <button
         onClick={onDismiss}
@@ -106,6 +101,7 @@ export default function App({ Component, pageProps, nonce }) {
   const showBanner = !bannerDismissed
     && bannerSuppressed === false
     && router.pathname !== '/'
+    && router.pathname !== '/doacoes'
     && !router.pathname.startsWith('/inevitavelgpt2');
 
   useEffect(() => {
