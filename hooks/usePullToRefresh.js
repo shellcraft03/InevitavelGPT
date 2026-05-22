@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 const THRESHOLD = 72;
 
 export function usePullToRefresh() {
-  const [pullY, setPullY]         = useState(0);
+  const [pullY, setPullY]           = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const touchStartY = useRef(null);
-  const pulling     = useRef(false);
+  const touchStartY  = useRef(null);
+  const pulling      = useRef(false);
+  const reloadTimer  = useRef(null);
 
   useEffect(() => {
     function onTouchStart(e) {
@@ -29,7 +30,7 @@ export function usePullToRefresh() {
       setPullY(prev => {
         if (prev >= THRESHOLD) {
           setRefreshing(true);
-          setTimeout(() => window.location.reload(), 300);
+          reloadTimer.current = setTimeout(() => window.location.reload(), 300);
         }
         return 0;
       });
@@ -37,11 +38,12 @@ export function usePullToRefresh() {
 
     window.addEventListener('touchstart', onTouchStart, { passive: true });
     window.addEventListener('touchmove',  onTouchMove,  { passive: true });
-    window.addEventListener('touchend',   onTouchEnd);
+    window.addEventListener('touchend',   onTouchEnd,   { passive: true });
     return () => {
       window.removeEventListener('touchstart', onTouchStart);
       window.removeEventListener('touchmove',  onTouchMove);
       window.removeEventListener('touchend',   onTouchEnd);
+      clearTimeout(reloadTimer.current);
     };
   }, []);
 
