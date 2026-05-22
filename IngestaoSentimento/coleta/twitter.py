@@ -1,7 +1,6 @@
 import os
 import logging
 import requests
-from requests_oauthlib import OAuth1
 from coleta.config import CANDIDATES
 
 log = logging.getLogger(__name__)
@@ -9,13 +8,8 @@ log = logging.getLogger(__name__)
 _SEARCH_URL = "https://api.twitter.com/2/tweets/search/recent"
 
 
-def _auth():
-    return OAuth1(
-        os.environ["BOT_CONSUMER_KEY"],
-        os.environ["BOT_CONSUMER_SECRET"],
-        os.environ["BOT_ACCESS_TOKEN"],
-        os.environ["BOT_ACCESS_TOKEN_SECRET"],
-    )
+def _headers():
+    return {"Authorization": f"Bearer {os.environ['TWITTER_BEARER_TOKEN']}"}
 
 
 def fetch_twitter(cursors=None, max_results=None):
@@ -28,7 +22,6 @@ def fetch_twitter(cursors=None, max_results=None):
     cursors = cursors or {}
     result = {c["slug"]: [] for c in CANDIDATES}
     new_cursors = {}
-    auth = _auth()
 
     for candidate in CANDIDATES:
         try:
@@ -42,7 +35,7 @@ def fetch_twitter(cursors=None, max_results=None):
             if since_id:
                 params["since_id"] = since_id
 
-            resp = requests.get(_SEARCH_URL, auth=auth, params=params, timeout=15)
+            resp = requests.get(_SEARCH_URL, headers=_headers(), params=params, timeout=15)
             if resp.status_code == 429:
                 log.warning("Twitter rate limited, stopping")
                 break
