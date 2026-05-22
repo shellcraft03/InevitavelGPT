@@ -117,7 +117,10 @@ livro-amarelo/
 │   ├── session.js                   # HMAC-SHA256 session cookie generation and validation
 │   ├── chunker.js                   # Text splitting and normalization (PDF)
 │   ├── vectorStore.js               # Embedding storage and search (Pinecone)
-│   └── rateLimiter.js               # IP-based rate limiting (shared across endpoints)
+│   ├── rateLimiter.js               # IP-based rate limiting (shared across endpoints)
+│   ├── chat-utils.js                # Shared utilities: sanitize, normalize, intFromEnv, getIp, parseRankedIds, RAG defaults
+│   ├── rag.js                       # Shared RAG pipeline: request guard, lexical rank, LLM rerank, retrieve, SSE, streaming
+│   └── rag-domains.js               # Topic expansions and stopwords per domain (livro and entrevistas)
 ├── proxy.js                         # Next.js middleware: per-request nonce-based CSP; injects x-nonce header for _document and GA
 ├── curar-indexar.bat                # Interactive local menu for video management (curation + indexing)
 ├── scripts/
@@ -147,16 +150,30 @@ livro-amarelo/
 │   ├── Procfile                     # worker: python main.py
 │   ├── runtime.txt                  # python-3.11
 │   ├── requirements.txt
+│   ├── conftest.py                  # pytest fixtures: env vars for tests without real credentials
 │   ├── main.py                      # worker main loop
 │   ├── run-local-worker.bat          # loads local .env and runs the worker on Windows
+│   ├── tests/
+│   │   └── test_worker.py           # tests for _parse_tweet, _strip_accents and _error_code
 │   └── InevitavelGPT2/
 │       ├── api.py                   # calls /api/bot/answer and /api/bot/image
 │       ├── db.py                    # Neon connection
 │       ├── worker.py                # multi-user orchestration
 │       └── x_api.py                 # mention reads, media upload and reply
+├── __tests__/
+│   └── lib/
+│       ├── chat-utils.test.js       # tests for sanitize, normalize, intFromEnv, getIp, parseRankedIds
+│       ├── session.test.js          # tests for HMAC-SHA256 cookie (issue, validate, expiry, tamper)
+│       ├── turnstile.test.js        # tests for verifyTurnstile (fetch mocks)
+│       ├── rateLimiter.test.js      # tests for in-memory fallback (minute + daily limit)
+│       └── rag.test.js              # tests for buildTopicTerms, lexicalRank, llmRerankChunks and setupSse
 └── IngestaoSentimento/              # Python worker — 2026 election sentiment tracker (Railway)
     ├── railway.toml                 # hourly cron; startCommand = python main.py
+    ├── conftest.py                  # pytest fixtures: env vars for tests without real credentials
     ├── main.py                      # orchestrator: RSS + Twitter + Polymarket
+    ├── tests/
+    │   ├── test_classifier.py       # tests for classify_texts_individual (labels, batching, padding)
+    │   └── test_main.py             # tests for _run_twitter_now (flags and UTC hours)
     └── coleta/
         ├── config.py                # candidate list and allowed RSS sources
         ├── classifier.py            # classify_texts_individual via OpenAI
@@ -439,6 +456,7 @@ global cursor updated in igpt2_global_settings (bot_mentions_since_id)
 
 | Command | Description |
 |---|---|
+| `npm test` | Run the Jest test suite (`__tests__/`) |
 | `npm run dev` | Development server on port 3000 |
 | `npm run build` | Production build |
 | `npm start` | Production server |
