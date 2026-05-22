@@ -1,16 +1,11 @@
 import logging
 import os
 import re
-import uuid
 import unicodedata
-
-import requests
 
 from . import api, x_api
 from .db import connect, dict_cursor
 
-WORKER_ID = os.environ.get('IGPT2_WORKER_ID') or f'igpt2-{os.getpid()}-{uuid.uuid4()}'
-INTERVAL_SECONDS = int(os.environ.get('IGPT2_WORKER_INTERVAL_SECONDS', '60'))
 TRIGGER_KEYWORD = os.environ.get('INEVITAVEL_GPT_KEYWORD') or os.environ.get('IGPT2_TRIGGER_KEYWORD')
 if not TRIGGER_KEYWORD:
     raise RuntimeError('Missing env var: INEVITAVEL_GPT_KEYWORD or IGPT2_TRIGGER_KEYWORD')
@@ -144,18 +139,24 @@ def _debit_success(conn, user_id, tweet_cost_cents):
             """,
             (tweet_cost_cents, user_id, tweet_cost_cents),
         )
+        if cur.rowcount == 0:
+            conn.rollback()
+            raise RuntimeError(f'Balance debit skipped: insufficient funds for user_id={user_id}')
     conn.commit()
     _record_balance_event(conn, user_id, -tweet_cost_cents, 'bot', 'Publicacao do bot')
 
 
-def _fresh_balance_ok(conn, user_id, tweet_cost_cents):
+def _fresh_balance(conn, user_id, tweet_cost_cents):
+    """Returns current balance in cents if approved and sufficient, else None."""
     with dict_cursor(conn) as cur:
         cur.execute(
             "SELECT credit_balance_cents, access_status FROM igpt2_access_grants WHERE user_id = %s",
             (user_id,),
         )
         row = cur.fetchone()
-    return bool(row and row['access_status'] == 'approved' and row['credit_balance_cents'] >= tweet_cost_cents)
+    if row and row['access_status'] == 'approved' and row['credit_balance_cents'] >= tweet_cost_cents:
+        return row['credit_balance_cents']
+    return None
 
 
 def _error_code(exc):
@@ -193,13 +194,18 @@ def _process_tweet(conn, account, tweet, tweet_cost_cents):
             raise RuntimeError('X media upload returned no media id')
 
         reply = x_api.create_reply(media_id, tweet['id'])
+        published_tweet_id = (reply.get('data') or {}).get('id')
         _record_run(
             conn, user_id, tweet, parsed, 'published', tweet_cost_cents,
             image_generated=image_generated,
-            published_tweet_id=(reply.get('data') or {}).get('id'),
+            published_tweet_id=published_tweet_id,
             api_result=f"x_api_status={reply.get('_http_status', 200)}",
         )
         _debit_success(conn, user_id, tweet_cost_cents)
+        logging.info(
+            'Reply published @%s tweet=%s reply=%s debited=%d cents',
+            account['x_username'], tweet['id'], published_tweet_id, tweet_cost_cents,
+        )
     except Exception as exc:
         logging.exception('Tweet processing failed @%s tweet=%s', account['x_username'], tweet.get('id'))
         _record_run(
@@ -248,9 +254,11 @@ def run_once():
             if not account:
                 logging.info('Skipping mention from non-approved author_id=%s', author_id)
                 continue
-            if not _fresh_balance_ok(conn, account['user_id'], tweet_cost_cents):
+            balance = _fresh_balance(conn, account['user_id'], tweet_cost_cents)
+            if balance is None:
                 logging.info('Skipping @%s: insufficient balance', account['x_username'])
                 continue
+            logging.info('Balance @%s: %d cents (cost=%d)', account['x_username'], balance, tweet_cost_cents)
             try:
                 _process_tweet(conn, account, tweet, tweet_cost_cents)
             except Exception as exc:
