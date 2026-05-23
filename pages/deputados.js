@@ -4,6 +4,7 @@ import { useDarkMode } from '../hooks/useDarkMode';
 import { useSessionGate } from '../hooks/useSessionGate';
 import Header from '../components/Header';
 import CustomSelect from '../components/CustomSelect';
+import ShareBar from '../components/ShareBar';
 
 const UF_LABELS = {
   AC: 'Acre', AL: 'Alagoas', AM: 'Amazonas', AP: 'Amapá', BA: 'Bahia',
@@ -173,6 +174,8 @@ export default function Deputados() {
               Câmara dos Deputados — Dados Abertos
             </a>
           </p>
+
+          <ShareBar />
 
         </main>
       </div>
