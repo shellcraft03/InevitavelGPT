@@ -6,6 +6,9 @@ Disallow: /deputados
 Disallow: /filiados
 Disallow: /entrevistas
 Disallow: /renan-santos-responde
+Disallow: /sentimento
+Disallow: /metodologia-sentimento
+Disallow: /noticias-sentimento
 Disallow: /api/
 
 Sitemap: https://www.inevitavelgpt.com/sitemap.xml
