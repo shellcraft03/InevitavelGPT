@@ -44,6 +44,7 @@ This web application allows users to explore the content of O Livro Amarelo and 
 - **Federal deputies** — `/deputados` page showing Chamber of Deputies composition by party and state, via the Câmara dos Deputados API
 - **Party membership data** — `/filiados` page showing party affiliation counts by state, automatically updated every Monday via GitHub Actions from public TSE data
 - **Pix donations (Livepix)** — Bot X/Twitter users donate via Pix; balance is credited automatically via webhook and converted into bot usage credits
+- **Missão MG** — `/missao-mg` page listing Missão pre-candidates in Minas Gerais for the 2026 elections; shows individual fundraising, goal percentage, donor count, and a direct support link per candidate; grouped by office
 - **2026 election sentiment tracker** — tracks public sentiment for the Brazilian presidential race: collects RSS news, Twitter/X posts, and Polymarket odds; classifies each item per candidate via GPT; displays scores, historical charts, and a daily news list; Python worker deployed on Railway (`IngestaoSentimento/`)
 - **Responsive** — layout adapted for desktop and mobile devices
 
@@ -89,6 +90,7 @@ livro-amarelo/
 │   ├── sentimento.js                # 2026 election sentiment tracker
 │   ├── metodologia-sentimento.js    # Scoring methodology (with live calculation demo)
 │   ├── noticias-sentimento.js       # Daily news with sentiment classifications
+│   ├── missao-mg.js                 # Missão pre-candidates in MG — fundraising, goal and donors
 │   ├── doacoes.js                   # Donations page ("Apoie") — public, no session protection
 │   ├── sobre.js                     # About page
 │   ├── privacidade.js               # Privacy policy
@@ -103,6 +105,7 @@ livro-amarelo/
 │       ├── sentimento.js            # Sentiment data per candidate (reads from Neon)
 │       ├── noticias-sentimento.js   # Daily news with sentiment classifications
 │       ├── tweets-sentimento.js     # Daily tweets per candidate
+│       ├── apoios-mg.js             # Pre-candidate data for MG
 │       ├── bot/
 │       │   ├── answer.js            # RAG for the bot — returns { answer, question, type } (X-Bot-Secret)
 │       │   └── image.js             # Generates 1080px JPEG with node-canvas + Inter TTF (X-Bot-Secret)
@@ -240,6 +243,9 @@ BLOCKED_YOUTUBE_CHANNEL_NAMES=...
 
 # Twitter bot — protects /api/bot/answer and /api/bot/image
 BOT_API_SECRET=...
+
+# Missão MG
+QUEROAPOIAR_API_URL=https://...
 
 # Livepix (Pix payments — Bot X/Twitter)
 LIVEPIX_CLIENT_ID=...

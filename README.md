@@ -44,6 +44,7 @@ Esta aplicação web permite explorar o conteúdo do Livro Amarelo e as entrevis
 - **Deputados federais** — página `/deputados` com composição da Câmara por partido e estado, via API da Câmara dos Deputados
 - **Filiados partidários** — página `/filiados` com dados de filiação por partido e estado, atualizada automaticamente toda segunda-feira via GitHub Actions a partir dos dados públicos do TSE
 - **Doações via Pix (Livepix)** — usuários do Bot X/Twitter fazem doações via Pix; o saldo é creditado automaticamente via webhook e convertido em créditos para uso no bot
+- **Missão MG** — página `/missao-mg` com pré-candidatos da Missão em Minas Gerais para as eleições 2026; exibe arrecadação individual, percentual da meta atingida, número de doadores e link direto para apoio; agrupada por cargo
 - **Sentimento eleitoral 2026** — rastreador de sentimento para as eleições presidenciais brasileiras: coleta RSS, Twitter/X e odds do Polymarket; classifica por candidato via GPT; exibe pontuações, histórico e lista de notícias diárias; worker Python deployado no Railway (`IngestaoSentimento/`)
 - **Responsivo** — layout adaptado para desktop e dispositivos móveis
 
@@ -89,6 +90,7 @@ livro-amarelo/
 │   ├── sentimento.js                # Rastreador de sentimento eleitoral 2026
 │   ├── metodologia-sentimento.js    # Explicação do método de pontuação (cálculo dinâmico)
 │   ├── noticias-sentimento.js       # Notícias do dia com classificações
+│   ├── missao-mg.js                 # Pré-candidatos da Missão em MG — arrecadação, meta e doadores
 │   ├── doacoes.js                   # Página de doações ("Apoie") — pública, sem proteção de sessão
 │   ├── sobre.js                     # Sobre o projeto
 │   ├── privacidade.js               # Política de privacidade
@@ -103,6 +105,7 @@ livro-amarelo/
 │       ├── sentimento.js            # Dados de sentimento por candidato (leitura do Neon)
 │       ├── noticias-sentimento.js   # Notícias do dia com classificações
 │       ├── tweets-sentimento.js     # Tweets do dia por candidato
+│       ├── apoios-mg.js             # Dados de pré-candidatos em MG
 │       ├── bot/
 │       │   ├── answer.js            # RAG para o bot — retorna { answer, question, type } (X-Bot-Secret)
 │       │   └── image.js             # Gera JPEG 1080px com node-canvas + Inter TTF (X-Bot-Secret)
@@ -240,6 +243,9 @@ BLOCKED_YOUTUBE_CHANNEL_NAMES=...
 
 # Bot Twitter — protege /api/bot/answer e /api/bot/image
 BOT_API_SECRET=...
+
+# Missão MG
+QUEROAPOIAR_API_URL=https://...
 
 # Livepix (pagamentos Pix — Bot X/Twitter)
 LIVEPIX_CLIENT_ID=...
