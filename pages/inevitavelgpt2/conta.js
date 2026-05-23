@@ -187,7 +187,7 @@ export default function BotXTwitterAccount() {
   return (
     <>
       <Head>
-        <title>Conta - Bot X/Twitter</title>
+        <title>Bot X/Twitter</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
       </Head>

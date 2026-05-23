@@ -72,7 +72,7 @@ export default function Deputados() {
   return (
     <>
       <Head>
-        <title>Deputados Federais — o Livro Amarelo</title>
+        <title>Deputados Federais</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
       </Head>
