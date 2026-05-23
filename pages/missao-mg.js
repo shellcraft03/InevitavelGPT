@@ -120,13 +120,14 @@ export default function MissaoMG() {
 
           {stats && (
             <div style={s.statsCard}>
+              <p style={{ ...s.sectionLabel, textAlign: 'center', color: s.title.color, marginBottom: '12px' }}>Pré-candidatos em Minas Gerais</p>
               <div style={s.statsRow}>
                 <span style={s.statValue}>{formatBRL(stats.total)}</span>
                 <span style={s.statValue}>{stats.candidatos}</span>
                 <span style={s.statValue}>{stats.doadores.toLocaleString('pt-BR')}</span>
               </div>
               <div style={s.statsRow}>
-                <span style={s.statLabel}>arrecadado em MG</span>
+                <span style={s.statLabel}>arrecadado</span>
                 <span style={s.statLabel}>{stats.candidatos === 1 ? 'candidato ativo' : 'candidatos ativos'}</span>
                 <span style={s.statLabel}>{stats.doadores === 1 ? 'doador' : 'doadores'}</span>
               </div>
