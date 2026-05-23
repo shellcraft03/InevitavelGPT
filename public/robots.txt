@@ -9,6 +9,7 @@ Disallow: /renan-santos-responde
 Disallow: /sentimento
 Disallow: /metodologia-sentimento
 Disallow: /noticias-sentimento
+Disallow: /missao-mg
 Disallow: /api/
 
 Sitemap: https://www.inevitavelgpt.com/sitemap.xml
