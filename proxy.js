@@ -8,7 +8,7 @@ export function proxy(request) {
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://challenges.cloudflare.com https://www.googletagmanager.com`,
     "frame-src https://challenges.cloudflare.com",
     "connect-src 'self' https://challenges.cloudflare.com https://www.google-analytics.com https://analytics.google.com",
-    "img-src 'self' data: https://www.google-analytics.com",
+    "img-src 'self' data: https://www.google-analytics.com https://media-queroapoiar.s3.sa-east-1.amazonaws.com",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self'",
     "object-src 'none'",
