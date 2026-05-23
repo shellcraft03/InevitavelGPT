@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useSessionGate } from '../hooks/useSessionGate';
 import Header from '../components/Header';
+import ShareBar from '../components/ShareBar';
 
 const MAX_QUESTION_LENGTH = 1000;
 
@@ -432,6 +433,8 @@ export default function RenanSantosResponde() {
               Ver entrevistas indexadas
             </a>
           </div>
+
+          <ShareBar />
 
         </main>
 

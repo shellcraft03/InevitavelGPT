@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useSessionGate } from '../hooks/useSessionGate';
 import Header from '../components/Header';
+import ShareBar from '../components/ShareBar';
 
 function YouTubeIcon() {
   return (
@@ -202,6 +203,8 @@ export default function Entrevistas() {
               ))}
             </div>
           )}
+
+          <ShareBar />
 
         </main>
       </div>

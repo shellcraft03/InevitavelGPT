@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 const SITE_URL = 'https://www.inevitavelgpt.com';
-const SHARE_TEXT = 'Explore o Livro Amarelo do Partido Missão com perguntas em linguagem natural.';
+const SHARE_TEXT = 'Explore o Livro Amarelo do Partido Missão e entrevistas do Renan Santos com perguntas em linguagem natural.';
 
 const WA_URL  = `https://wa.me/?text=${encodeURIComponent(SHARE_TEXT + ' ' + SITE_URL)}`;
 const X_URL   = `https://x.com/intent/tweet?text=${encodeURIComponent(SHARE_TEXT)}&url=${encodeURIComponent(SITE_URL)}`;
