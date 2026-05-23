@@ -91,6 +91,8 @@ input, textarea {
 /* ── QA: input row ── */
 .input-row { display: flex; gap: 10px; }
 
+.donation-input::placeholder { opacity: 0.35; }
+
 @media (max-width: 480px) {
   .input-row         { flex-direction: column; }
   .input-row button  { width: 100%; }

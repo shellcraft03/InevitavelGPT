@@ -302,6 +302,7 @@ export default function BotXTwitterAccount() {
                         onChange={e => setDonationAmount(e.target.value.replace(/[^0-9]/g, ''))}
                         onFocus={() => setDonationFocused(true)}
                         onBlur={() => setDonationFocused(false)}
+                        className="donation-input"
                         style={s.amountInput}
                       />
                       <button
