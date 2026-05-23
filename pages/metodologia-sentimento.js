@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useDarkMode } from '../hooks/useDarkMode';
 import Header from '../components/Header';
+import ShareBar from '../components/ShareBar';
 
 const WEIGHTS = { polymarket: 80, rss: 10, twitter: 10 };
 const FONTE_LABEL = { polymarket: 'Polymarket', rss: 'Notícias', twitter: 'X/Twitter' };
@@ -280,6 +281,8 @@ export default function MetodologiaSentimento() {
               <li>Os dados refletem o momento da coleta e podem mudar rapidamente após eventos políticos.</li>
             </ul>
           </div>
+
+          <ShareBar />
 
         </main>
       </div>

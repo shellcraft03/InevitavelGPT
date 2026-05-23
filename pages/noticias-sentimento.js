@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useSessionGate } from '../hooks/useSessionGate';
 import Header from '../components/Header';
+import ShareBar from '../components/ShareBar';
 
 const SENT_LABEL = { positivo: 'Positivo', neutro: 'Neutro', negativo: 'Negativo' };
 const SENT_COLOR = { positivo: '#22c55e', neutro: '#6b7280', negativo: '#ef4444' };
@@ -149,6 +150,8 @@ export default function NoticiasSentimento() {
               </div>
             </>
           )}
+
+          <ShareBar />
 
         </main>
       </div>
