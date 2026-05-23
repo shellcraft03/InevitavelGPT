@@ -226,7 +226,7 @@ function CandidateCard({ item, dark, s }) {
       <div style={s.progressWrap}>
         {meta > 0 && (
           <div style={s.progressTrack}>
-            <div style={{ ...s.progressBar, width: `${pct}%`, background: accent }} />
+            <div style={{ ...s.progressBar, width: `${pct}%`, background: '#FCBF22' }} />
           </div>
         )}
         <div style={s.progressRow}>
