@@ -1,4 +1,4 @@
-import { checkMinuteLimit, checkDailyLimit } from '../../lib/rateLimiter.js';
+import { checkMinuteLimit, checkDailyLimit, checkSessionLimit } from '../../lib/rateLimiter.js';
 
 // Tests run without Redis env vars → exercises the in-memory fallback path
 
@@ -46,6 +46,38 @@ describe('checkDailyLimit (in-memory fallback)', () => {
       await checkDailyLimit(ip);
     }
     const result = await checkDailyLimit(ip);
+    expect(result.ok).toBe(false);
+    expect(result.remaining).toBe(0);
+  });
+});
+
+describe('checkSessionLimit (in-memory fallback)', () => {
+  const SESSION_LIMIT = parseInt(process.env.SESSION_QUESTION_LIMIT || '30', 10);
+
+  test('returns ok=true when sessionId is null', async () => {
+    const result = await checkSessionLimit(null);
+    expect(result.ok).toBe(true);
+  });
+
+  test('allows first request for a session', async () => {
+    const result = await checkSessionLimit('test-session-sl-first');
+    expect(result.ok).toBe(true);
+    expect(result.remaining).toBe(SESSION_LIMIT - 1);
+  });
+
+  test('remaining decrements on each call', async () => {
+    const id = 'test-session-sl-decrement';
+    const r1 = await checkSessionLimit(id);
+    const r2 = await checkSessionLimit(id);
+    expect(r2.remaining).toBe(r1.remaining - 1);
+  });
+
+  test('blocks after SESSION_QUESTION_LIMIT requests', async () => {
+    const id = 'test-session-sl-block';
+    for (let i = 0; i < SESSION_LIMIT; i++) {
+      await checkSessionLimit(id);
+    }
+    const result = await checkSessionLimit(id);
     expect(result.ok).toBe(false);
     expect(result.remaining).toBe(0);
   });

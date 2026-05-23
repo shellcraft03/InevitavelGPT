@@ -1,4 +1,4 @@
-import { setHumanSessionCookie, hasValidHumanSession } from '../../lib/session.js';
+import { setHumanSessionCookie, hasValidHumanSession, getSessionId } from '../../lib/session.js';
 
 const SECRET = 'test-secret-at-least-32-chars-long-xxx';
 
@@ -60,6 +60,27 @@ describe('hasValidHumanSession', () => {
 
   test('empty cookie value is rejected', () => {
     expect(hasValidHumanSession(reqWith('ia_session='))).toBe(false);
+  });
+});
+
+describe('getSessionId', () => {
+  beforeEach(() => { process.env.APP_SESSION_SECRET = SECRET; });
+  afterEach(() => { delete process.env.APP_SESSION_SECRET; });
+
+  test('returns a 32-char hex string for a valid session', () => {
+    const id = getSessionId(reqWith(issueSession()));
+    expect(typeof id).toBe('string');
+    expect(id).toHaveLength(32);
+    expect(id).toMatch(/^[0-9a-f]+$/);
+  });
+
+  test('returns null when no cookie is present', () => {
+    expect(getSessionId({ headers: {} })).toBeNull();
+  });
+
+  test('returns the same id for the same cookie', () => {
+    const cookie = issueSession();
+    expect(getSessionId(reqWith(cookie))).toBe(getSessionId(reqWith(cookie)));
   });
 });
 
