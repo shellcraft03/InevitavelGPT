@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useSessionGate } from '../hooks/useSessionGate';
 import Header from '../components/Header';
+import ShareBar from '../components/ShareBar';
 
 const FONTES = [
   { key: 'polymarket', label: 'Polymarket' },
@@ -307,6 +308,8 @@ export default function Sentimento() {
             ou incentivo a apostas. Este projeto tem fins estritamente analíticos e
             não compactua com nenhuma forma de jogo ou especulação financeira.
           </p>
+
+          <ShareBar />
 
         </main>
       </div>
