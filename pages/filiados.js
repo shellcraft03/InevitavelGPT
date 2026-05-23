@@ -74,7 +74,7 @@ export default function Filiados() {
   return (
     <>
       <Head>
-        <title>Filiados Partidários — o Livro Amarelo</title>
+        <title>Filiados Partidários</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
       </Head>

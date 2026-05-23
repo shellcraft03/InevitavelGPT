@@ -13,7 +13,7 @@ export default function Sobre() {
   return (
     <>
       <Head>
-        <title>Sobre — o Livro Amarelo</title>
+        <title>Sobre</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
       </Head>

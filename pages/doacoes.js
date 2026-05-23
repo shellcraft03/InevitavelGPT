@@ -10,7 +10,7 @@ export default function Doacoes() {
   return (
     <>
       <Head>
-        <title>Apoie o Projeto — o Livro Amarelo</title>
+        <title>Apoie o Projeto</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
       </Head>

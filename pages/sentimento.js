@@ -117,7 +117,7 @@ export default function Sentimento() {
   return (
     <>
       <Head>
-        <title>Sentimento Eleitoral 2026 — Inevitável GPT</title>
+        <title>Sentimento Eleitoral 2026</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
       </Head>

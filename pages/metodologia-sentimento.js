@@ -82,7 +82,7 @@ export default function MetodologiaSentimento() {
   return (
     <>
       <Head>
-        <title>Metodologia — Sentimento Eleitoral 2026</title>
+        <title>Metodologia</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
       </Head>
