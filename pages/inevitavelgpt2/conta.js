@@ -245,10 +245,15 @@ export default function BotXTwitterAccount() {
               <section style={s.card}>
                 <h2 style={s.sectionTitle}>Como funciona</h2>
                 <p style={s.bodyText}>
-                  Mencione @Inevitavel_Bot com a palavra "GPT" e os termos "Livro Amarelo"
+                  Mencione @Inevitavel_Bot no X/Twitter com a palavra "GPT" e os termos "Livro Amarelo"
                   ou "Renan Santos". O bot detecta a menção e publica a resposta pelo perfil
                   @Inevitavel_Bot. Cada resposta consome {formatReais(tweetCostCents)} do saldo disponível.
                 </p>
+                <div style={{ marginTop: '16px', borderLeft: '3px solid #FCBF22', paddingLeft: '14px' }}>
+                  <p style={{ ...s.bodyText, margin: 0, fontSize: '0.85rem' }}>
+                    Exemplo: <em>@Inevitavel_Bot GPT O que Renan Santos pensa sobre reforma fiscal?</em>
+                  </p>
+                </div>
               </section>
 
               <section style={s.card}>
