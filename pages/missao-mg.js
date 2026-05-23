@@ -120,18 +120,14 @@ export default function MissaoMG() {
 
           {stats && (
             <div style={s.statsCard}>
-              <div style={s.statItem}>
+              <div style={s.statsRow}>
                 <span style={s.statValue}>{formatBRL(stats.total)}</span>
-                <span style={s.statLabel}>arrecadado em MG</span>
-              </div>
-              <div style={s.statDivider} />
-              <div style={s.statItem}>
                 <span style={s.statValue}>{stats.candidatos}</span>
-                <span style={s.statLabel}>{stats.candidatos === 1 ? 'candidato ativo' : 'candidatos ativos'}</span>
-              </div>
-              <div style={s.statDivider} />
-              <div style={s.statItem}>
                 <span style={s.statValue}>{stats.doadores.toLocaleString('pt-BR')}</span>
+              </div>
+              <div style={s.statsRow}>
+                <span style={s.statLabel}>arrecadado em MG</span>
+                <span style={s.statLabel}>{stats.candidatos === 1 ? 'candidato ativo' : 'candidatos ativos'}</span>
                 <span style={s.statLabel}>{stats.doadores === 1 ? 'doador' : 'doadores'}</span>
               </div>
             </div>
@@ -313,19 +309,16 @@ function getStyles(dark) {
     statsCard: {
       background: cardBg,
       borderRadius: '12px',
-      padding: '20px 24px',
+      padding: '16px 20px',
       border: `2px solid ${cardBdr}`,
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-around',
-      gap: '16px',
-      flexWrap: 'wrap',
-    },
-    statItem: {
-      display: 'flex',
       flexDirection: 'column',
-      alignItems: 'center',
-      gap: '4px',
+      gap: '6px',
+    },
+    statsRow: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'baseline',
     },
     statValue: {
       fontSize: '1.25rem',
@@ -333,6 +326,8 @@ function getStyles(dark) {
       color: text1,
       fontVariantNumeric: 'tabular-nums',
       letterSpacing: '-0.02em',
+      flex: 1,
+      textAlign: 'center',
     },
     statLabel: {
       fontSize: '0.68rem',
@@ -340,12 +335,8 @@ function getStyles(dark) {
       color: textDim,
       textTransform: 'uppercase',
       letterSpacing: '0.08em',
-    },
-    statDivider: {
-      width: '1px',
-      height: '32px',
-      background: dark ? '#2A2A2A' : '#E8E8E8',
-      flexShrink: 0,
+      flex: 1,
+      textAlign: 'center',
     },
     section: {
       display: 'flex',
