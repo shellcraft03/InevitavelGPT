@@ -53,7 +53,7 @@ export default function NoticiasSentimento() {
   return (
     <>
       <Head>
-        <title>Notícias Analisadas — Sentimento Eleitoral 2026</title>
+        <title>Notícias Analisadas</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
       </Head>
