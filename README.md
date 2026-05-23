@@ -37,7 +37,8 @@ Esta aplicação web permite explorar o conteúdo do Livro Amarelo e as entrevis
 - **Curadoria automática de entrevistas** — agente de IA avalia periodicamente links submetidos por usuários e aprova/reprova com base em critérios (entrevistado principal, entrevista completa, canal independente, conteúdo político substantivo)
 - **Submissão de vídeos por usuários** — formulário na página `/entrevistas` para sugerir links do YouTube; protegido por Turnstile + rate limit
 - **Proteção por CAPTCHA** — Cloudflare Turnstile com inicialização lazy (ativa apenas no foco do input); na entrada cria um cookie de sessão HMAC-SHA256 HttpOnly (TTL 1h) — endpoints de chat pulam o Turnstile enquanto a sessão for válida
-- **Rate limiting compartilhado** — 10 req/min e 50 req/dia por IP via Sliding Window (`@upstash/ratelimit`); contadores compartilhados entre todos os endpoints (chat do livro, chat de entrevistas e submissão de vídeos) · fallback em memória (dev local)
+- **Validação de Origin** — endpoints de chat rejeitam requisições sem `Origin: https://www.inevitavelgpt.com`, bloqueando Postman, curl e scripts automatizados
+- **Rate limiting compartilhado** — 10 req/min e 50 req/dia por IP + 30 perguntas por sessão (1h) via Sliding Window (`@upstash/ratelimit`); fallback em memória (dev local)
 - **Bloqueio de canais** — curadoria rejeita automaticamente vídeos de canais configurados em `BLOCKED_YOUTUBE_CHANNEL_NAMES` (termos separados por `;`)
 - **Respostas concretas** — o modelo cita apenas o que está explicitamente nas fontes indexadas
 - **Deputados federais** — página `/deputados` com composição da Câmara por partido e estado, via API da Câmara dos Deputados
@@ -167,7 +168,7 @@ livro-amarelo/
 │       ├── chat-utils.test.js       # testes de sanitize, normaliza, intFromEnv, getIp, parseRankedIds
 │       ├── session.test.js          # testes de cookie HMAC-SHA256 (emissão, validação, expiração, tamper)
 │       ├── turnstile.test.js        # testes de verifyTurnstile (mocks de fetch)
-│       ├── rateLimiter.test.js      # testes do fallback em memória (minute + daily limit)
+│       ├── rateLimiter.test.js      # testes do fallback em memória (minute + daily + session limit)
 │       └── rag.test.js              # testes de buildTopicTerms, lexicalRank, llmRerankChunks e setupSse
 └── IngestaoSentimento/              # Worker Python — rastreador de sentimento eleitoral (Railway)
     ├── railway.toml                 # cron horário; startCommand = python main.py
@@ -340,12 +341,14 @@ Usuário
               ▼
 ┌───────────────────────────────────────────┐
 │  /api/chat  ou  /api/chat-entrevistas     │
-│  1. Verifica sessão (cookie) ou Turnstile │
-│  2. Rate limit por IP (min + dia)         │
-│  3. Reescreve query + gera embeddings     │
-│  4. Busca e re-ranqueia chunks (Pinecone) │
-│  5. Monta prompt com contexto             │
-│  6. GPT-4.1 responde via streaming        │
+│  1. Valida Origin header                  │
+│  2. Verifica sessão (cookie) ou Turnstile │
+│  3. Rate limit por IP (min + dia)         │
+│     + limite por sessão (30/h)            │
+│  4. Reescreve query + gera embeddings     │
+│  5. Busca e re-ranqueia chunks (Pinecone) │
+│  6. Monta prompt com contexto             │
+│  7. GPT-4.1 responde via streaming        │
 └─────────────┬─────────────────────────────┘
               │
               ▼
