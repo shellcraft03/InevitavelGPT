@@ -7,7 +7,7 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'Banco de dados não configurado.' });
   }
 
-  res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600');
+  res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=1800');
 
   try {
     const url = process.env.DATABASE_URL.replace(/^postgres:\/\//, 'postgresql://');
