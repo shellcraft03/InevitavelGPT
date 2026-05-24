@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     const url = process.env.DATABASE_URL.replace(/^postgres:\/\//, 'postgresql://');
     const sql = neon(url);
 
-    const [candidatos, rows] = await Promise.all([
+    const [candidatos, rows, leituraRows] = await Promise.all([
       sql`
         SELECT slug, nome, partido
         FROM eleicoes_candidatos
@@ -32,6 +32,10 @@ export default async function handler(req, res) {
         WHERE data >= CURRENT_DATE - INTERVAL '30 days'
         ORDER BY data DESC
       `,
+      sql`
+        SELECT fonte, candidato_slug, ultimo_ts
+        FROM eleicoes_ultima_leitura
+      `,
     ]);
 
     const sentimento = {};
@@ -43,7 +47,7 @@ export default async function handler(req, res) {
       if (bucket) bucket.push(row);
     }
 
-    return res.status(200).json({ candidatos, sentimento });
+    return res.status(200).json({ candidatos, sentimento, ultima_leitura: leituraRows });
   } catch (err) {
     console.error('[api/sentimento]', err);
     return res.status(500).json({ error: 'Erro ao consultar o banco de dados.' });

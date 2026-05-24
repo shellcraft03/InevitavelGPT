@@ -10,7 +10,7 @@ from coleta.db import (ensure_tables, upsert_sentiment, insert_noticias,
                         get_twitter_cursors, save_twitter_cursor,
                         get_existing_news_urls, compute_rss_sentiment,
                         insert_tweets, compute_twitter_sentiment,
-                        clear_rss_today)
+                        clear_rss_today, update_ultima_leitura)
 from coleta.rss import fetch_rss
 from coleta.classifier import classify_texts_individual
 from coleta.twitter import fetch_twitter
@@ -102,6 +102,7 @@ def main():
                         if t and t["total"] > 0:
                             upsert_sentiment(conn, c["slug"], "rss", today,
                                              t["pos"], t["neu"], t["neg"], t["total"])
+                            update_ultima_leitura(conn, "rss", c["slug"])
                             log.info(f"RSS {c['slug']}: +{t['pos']} ~{t['neu']} -{t['neg']} / {t['total']}")
                     conn.commit()
                 except Exception:
@@ -136,6 +137,7 @@ def main():
                     if t and t["total"] > 0:
                         upsert_sentiment(conn, c["slug"], "twitter", today,
                                          t["pos"], t["neu"], t["neg"], t["total"])
+                        update_ultima_leitura(conn, "twitter", c["slug"])
                         log.info(f"Twitter {c['slug']}: total dia +{t['pos']} ~{t['neu']} -{t['neg']} / {t['total']}")
                 conn.commit()
             except Exception:
@@ -152,6 +154,7 @@ def main():
                         if odds is not None:
                             upsert_sentiment(conn, c["slug"], "polymarket", today,
                                              0, 0, 0, 0, odds=odds)
+                    update_ultima_leitura(conn, "polymarket")
                     conn.commit()
                 except Exception:
                     conn.rollback()

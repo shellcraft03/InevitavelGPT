@@ -131,6 +131,14 @@ def ensure_tables(conn):
             CREATE INDEX IF NOT EXISTS idx_classificacoes_slug_relevante
             ON eleicoes_noticias_classificacoes (candidato_slug, relevante)
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS eleicoes_ultima_leitura (
+                fonte          VARCHAR(50)  NOT NULL,
+                candidato_slug VARCHAR(100) NOT NULL DEFAULT '',
+                ultimo_ts      TIMESTAMPTZ  NOT NULL,
+                PRIMARY KEY (fonte, candidato_slug)
+            )
+        """)
         for c in CANDIDATES:
             cur.execute("""
                 INSERT INTO eleicoes_candidatos (slug, nome, partido)
@@ -266,6 +274,16 @@ def save_twitter_cursor(conn, slug, since_id):
                 since_id      = EXCLUDED.since_id,
                 atualizado_em = NOW()
         """, (slug, since_id))
+
+
+def update_ultima_leitura(conn, fonte, candidato_slug=''):
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO eleicoes_ultima_leitura (fonte, candidato_slug, ultimo_ts)
+            VALUES (%s, %s, NOW())
+            ON CONFLICT (fonte, candidato_slug) DO UPDATE
+                SET ultimo_ts = NOW()
+        """, (fonte, candidato_slug))
 
 
 def upsert_sentiment(conn, slug, fonte, date, pos, neu, neg, vol,

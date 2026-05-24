@@ -12,6 +12,20 @@ const FONTES = [
   { key: 'rss',        label: 'Notícias'   },
 ];
 
+function formatTs(isoString) {
+  if (!isoString) return null;
+  const d = new Date(isoString);
+  const parts = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d);
+  const p = {};
+  parts.forEach(({ type, value }) => { p[type] = value; });
+  return `${p.day}/${p.month}/${p.year} às ${p.hour}:${p.minute}`;
+}
+
 const PARTIDO_CORES = { PT: '#CC0000', PL: '#003F8C' };
 function partidoCor(partido, dark) {
   if (partido === 'Missão') return dark ? '#FFD700' : '#B8860B';
@@ -66,7 +80,11 @@ export default function Sentimento() {
             }));
           }
         }
-        setData({ ...d, sentimento: sent });
+        const leituraMap = {};
+        for (const row of d.ultima_leitura || []) {
+          leituraMap[`${row.fonte}:${row.candidato_slug}`] = row.ultimo_ts;
+        }
+        setData({ ...d, sentimento: sent, leituraMap });
         setLoading(false);
       })
       .catch(e => { setError(e.message); setLoading(false); });
@@ -196,6 +214,8 @@ export default function Sentimento() {
                 {candidatos.map(c => {
                   const row = latestRow(c.slug);
                   const cor = partidoCor(c.partido, dark);
+                  const leituraKey = fonte === 'polymarket' ? 'polymarket:' : `${fonte}:${c.slug}`;
+                  const ultimaTs = formatTs(data?.leituraMap?.[leituraKey]);
 
                   return (
                     <div key={c.slug} style={s.candidateCard}>
@@ -232,9 +252,9 @@ export default function Sentimento() {
                         </>
                       )}
 
-                      {row?.data && (
+                      {ultimaTs && (
                         <div style={s.dateLabel}>
-                          {new Date(row.data).toLocaleDateString('pt-BR', { timeZone: row.data.length === 10 ? 'UTC' : 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          {ultimaTs}
                         </div>
                       )}
                     </div>
