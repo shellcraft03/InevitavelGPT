@@ -61,6 +61,20 @@ def upload_media(image_bytes):
     return data.get('media_id_string')
 
 
+def post_tweet(text):
+    response = requests.post(
+        'https://api.x.com/2/tweets',
+        auth=_bot_oauth1(),
+        data=json.dumps({'text': text}),
+        headers={'Content-Type': 'application/json'},
+        timeout=30,
+    )
+    if not response.ok:
+        logging.error('post_tweet %s: %s', response.status_code, response.text[:500])
+    response.raise_for_status()
+    return response.json()
+
+
 def create_reply(media_id, reply_to_id):
     response = requests.post(
         'https://api.x.com/2/tweets',
