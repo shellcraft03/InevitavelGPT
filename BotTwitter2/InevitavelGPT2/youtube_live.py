@@ -6,15 +6,9 @@ import requests
 from . import db
 from .x_api import post_tweet
 
-_CHANNELS_URL = 'https://www.googleapis.com/youtube/v3/channels'
 _PLAYLIST_ITEMS_URL = 'https://www.googleapis.com/youtube/v3/playlistItems'
 _VIDEOS_URL = 'https://www.googleapis.com/youtube/v3/videos'
 _MAX_TITLE_LEN = 100
-
-
-def _get_handles():
-    raw = os.environ.get('YLIVE_CHANNEL_HANDLES', '').strip().strip('"\'')
-    return [h.lstrip('@').strip() for h in raw.split(';') if h.strip()]
 
 
 def _ensure_tables(conn):
@@ -25,9 +19,11 @@ def _ensure_tables(conn):
                 handle TEXT NOT NULL UNIQUE,
                 channel_id TEXT NOT NULL,
                 channel_name TEXT,
+                twitter_handle TEXT,
                 created_at TIMESTAMPTZ DEFAULT NOW()
             )
         """)
+        cur.execute("ALTER TABLE ylive_channels ADD COLUMN IF NOT EXISTS twitter_handle TEXT")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS ylive_posted (
                 id SERIAL PRIMARY KEY,
@@ -40,53 +36,10 @@ def _ensure_tables(conn):
     conn.commit()
 
 
-def _load_known_channels(conn):
+def _load_channels(conn):
     with db.dict_cursor(conn) as cur:
-        cur.execute('SELECT handle, channel_id, channel_name FROM ylive_channels')
-        return {row['handle']: row for row in cur.fetchall()}
-
-
-def _resolve_handle(handle):
-    resp = requests.get(
-        _CHANNELS_URL,
-        params={'part': 'id,snippet', 'forHandle': handle, 'key': os.environ['YOUTUBE_API_KEY']},
-        timeout=15,
-    )
-    resp.raise_for_status()
-    items = resp.json().get('items', [])
-    if not items:
-        return None, None
-    item = items[0]
-    return item['id'], item['snippet']['title']
-
-
-def _save_channel(conn, handle, channel_id, channel_name):
-    with conn.cursor() as cur:
-        cur.execute(
-            'INSERT INTO ylive_channels (handle, channel_id, channel_name) VALUES (%s, %s, %s)'
-            ' ON CONFLICT (handle) DO NOTHING',
-            (handle, channel_id, channel_name),
-        )
-    conn.commit()
-
-
-def _resolve_new_handles(conn, handles, known):
-    result = dict(known)
-    for handle in handles:
-        if handle in known:
-            continue
-        try:
-            channel_id, channel_name = _resolve_handle(handle)
-        except Exception as exc:
-            logging.error('Failed to resolve handle @%s: %s', handle, exc)
-            continue
-        if not channel_id:
-            logging.warning('No channel found for handle @%s', handle)
-            continue
-        _save_channel(conn, handle, channel_id, channel_name)
-        result[handle] = {'handle': handle, 'channel_id': channel_id, 'channel_name': channel_name}
-        logging.info('Resolved @%s → %s (%s)', handle, channel_id, channel_name)
-    return result
+        cur.execute('SELECT handle, channel_id, channel_name, twitter_handle FROM ylive_channels')
+        return cur.fetchall()
 
 
 def _get_recent_video_ids(channel_id):
@@ -103,10 +56,7 @@ def _get_recent_video_ids(channel_id):
         timeout=15,
     )
     resp.raise_for_status()
-    return [
-        item['contentDetails']['videoId']
-        for item in resp.json().get('items', [])
-    ]
+    return [item['contentDetails']['videoId'] for item in resp.json().get('items', [])]
 
 
 def _check_live_videos(video_ids):
@@ -144,33 +94,34 @@ def _record_posted(conn, channel_id, video_id, tweet_id):
     conn.commit()
 
 
-def _build_tweet(channel_name, video_title, video_id):
+def _build_tweet(channel_name, video_title, video_id, twitter_handle=None):
     if len(video_title) > _MAX_TITLE_LEN:
         video_title = video_title[:_MAX_TITLE_LEN - 1] + '…'
-    return (
+    text = (
         f'🔴 {channel_name} está ao vivo agora!\n\n'
         f'{video_title}\n'
         f'https://youtube.com/watch?v={video_id}'
     )
+    if twitter_handle:
+        text += f'\n\n{twitter_handle}'
+    return text
 
 
 def run_once():
-    handles = _get_handles()
-    if not handles:
-        return
-
     conn = db.connect()
     try:
         _ensure_tables(conn)
-        known = _load_known_channels(conn)
-        channels = _resolve_new_handles(conn, handles, known)
+        channels = _load_channels(conn)
 
-        for handle in handles:
-            row = channels.get(handle)
-            if not row:
-                continue
+        if not channels:
+            logging.info('No channels configured in ylive_channels')
+            return
+
+        for row in channels:
+            handle = row['handle']
             channel_id = row['channel_id']
             channel_name = row['channel_name'] or handle
+            twitter_handle = row['twitter_handle']
 
             try:
                 video_ids = _get_recent_video_ids(channel_id)
@@ -199,7 +150,7 @@ def run_once():
                     logging.info('Already posted for video %s (@%s)', video_id, handle)
                     continue
 
-                text = _build_tweet(channel_name, video_title, video_id)
+                text = _build_tweet(channel_name, video_title, video_id, twitter_handle)
                 try:
                     result = post_tweet(text)
                     tweet_id = result.get('data', {}).get('id')
