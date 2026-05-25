@@ -1,13 +1,15 @@
 import logging
 import os
+import re
 
 import requests
 
 from . import db
 from .x_api import post_tweet
 
-_PLAYLIST_ITEMS_URL = 'https://www.googleapis.com/youtube/v3/playlistItems'
 _VIDEOS_URL = 'https://www.googleapis.com/youtube/v3/videos'
+_LIVE_URL = 'https://www.youtube.com/channel/{channel_id}/live'
+_LIVE_CHECK_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
 _MAX_TITLE_LEN = 100
 
 
@@ -42,11 +44,65 @@ def _load_channels(conn):
         return cur.fetchall()
 
 
-def _get_recent_video_ids(channel_id):
-    # uploads playlist ID = channel ID with UC → UU (1 quota unit)
+def _check_live_url(channel_id):
+    """Check if channel is live by parsing the /live page HTML.
+
+    Returns (is_live, video_id, blocked).
+    blocked=True means YouTube rejected the request — fall back to API.
+    """
+    url = _LIVE_URL.format(channel_id=channel_id)
+    try:
+        resp = requests.get(url, headers=_LIVE_CHECK_HEADERS, allow_redirects=True, timeout=15)
+    except Exception as exc:
+        logging.warning('Live URL request failed for %s: %s', channel_id, exc)
+        return False, None, True
+
+    if resp.status_code in (403, 429):
+        logging.warning('YouTube blocked live URL check for %s (HTTP %s)', channel_id, resp.status_code)
+        return False, None, True
+
+    final_url = resp.url
+    if 'consent' in final_url or 'accounts.google' in final_url:
+        logging.warning('YouTube redirected to consent/login for %s — blocked', channel_id)
+        return False, None, True
+
+    if '"isLive":true' not in resp.text:
+        return False, None, False
+
+    match = (
+        re.search(r'"videoId":"([a-zA-Z0-9_-]{11})"[^}]{0,200}"isLive":true', resp.text)
+        or re.search(r'"isLive":true[^}]{0,200}"videoId":"([a-zA-Z0-9_-]{11})"', resp.text)
+    )
+    if not match:
+        logging.warning('Live detected for %s but could not extract video ID — falling back to API', channel_id)
+        return False, None, True
+
+    return True, match.group(1), False
+
+
+def _get_video_title(video_id):
+    # 1 quota unit
+    resp = requests.get(
+        _VIDEOS_URL,
+        params={
+            'part': 'snippet',
+            'id': video_id,
+            'key': os.environ['YOUTUBE_API_KEY'],
+        },
+        timeout=15,
+    )
+    resp.raise_for_status()
+    items = resp.json().get('items', [])
+    if not items:
+        return ''
+    return items[0]['snippet'].get('title', '')
+
+
+def _get_live_videos_api(channel_id):
+    """Fallback: playlistItems + videos.list (2 quota units)."""
     playlist_id = 'UU' + channel_id[2:]
     resp = requests.get(
-        _PLAYLIST_ITEMS_URL,
+        'https://www.googleapis.com/youtube/v3/playlistItems',
         params={
             'part': 'contentDetails',
             'playlistId': playlist_id,
@@ -56,15 +112,14 @@ def _get_recent_video_ids(channel_id):
         timeout=15,
     )
     resp.raise_for_status()
-    return [item['contentDetails']['videoId'] for item in resp.json().get('items', [])]
+    video_ids = [item['contentDetails']['videoId'] for item in resp.json().get('items', [])]
+    if not video_ids:
+        return []
 
-
-def _check_live_videos(video_ids):
-    # Single videos.list call (1 quota unit) covers all IDs
     resp = requests.get(
         _VIDEOS_URL,
         params={
-            'part': 'snippet,liveStreamingDetails',
+            'part': 'snippet',
             'id': ','.join(video_ids),
             'key': os.environ['YOUTUBE_API_KEY'],
         },
@@ -107,6 +162,25 @@ def _build_tweet(channel_name, video_title, video_id, twitter_handle=None):
     return text
 
 
+def _process_live_videos(conn, live_videos, channel_id, channel_name, twitter_handle, handle):
+    for video in live_videos:
+        video_id = video['video_id']
+        video_title = video['title']
+
+        if _already_posted(conn, video_id):
+            logging.info('Already posted for video %s (@%s)', video_id, handle)
+            continue
+
+        text = _build_tweet(channel_name, video_title, video_id, twitter_handle)
+        try:
+            result = post_tweet(text)
+            tweet_id = result.get('data', {}).get('id')
+            _record_posted(conn, channel_id, video_id, tweet_id)
+            logging.info('Posted tweet %s for video %s (@%s)', tweet_id, video_id, handle)
+        except Exception as exc:
+            logging.error('Failed to post tweet for video %s: %s', video_id, exc)
+
+
 def run_once():
     conn = db.connect()
     try:
@@ -123,40 +197,33 @@ def run_once():
             channel_name = row['channel_name'] or handle
             twitter_handle = row['twitter_handle']
 
-            try:
-                video_ids = _get_recent_video_ids(channel_id)
-            except Exception as exc:
-                logging.error('playlistItems error for @%s: %s', handle, exc)
+            is_live, video_id, blocked = _check_live_url(channel_id)
+
+            if blocked:
+                # Fall back to API-based detection
+                try:
+                    live_videos = _get_live_videos_api(channel_id)
+                except Exception as exc:
+                    logging.error('API fallback error for @%s: %s', handle, exc)
+                    continue
+                if not live_videos:
+                    logging.info('No live stream for @%s (API fallback)', handle)
+                    continue
+                _process_live_videos(conn, live_videos, channel_id, channel_name, twitter_handle, handle)
                 continue
 
-            if not video_ids:
+            if not is_live:
+                logging.info('No live stream for @%s', handle)
                 continue
 
+            # Live detected via URL redirect — fetch title (1 quota unit)
             try:
-                live_videos = _check_live_videos(video_ids)
+                title = _get_video_title(video_id)
             except Exception as exc:
                 logging.error('videos.list error for @%s: %s', handle, exc)
                 continue
 
-            if not live_videos:
-                logging.info('No live stream for @%s', handle)
-                continue
+            _process_live_videos(conn, [{'video_id': video_id, 'title': title}], channel_id, channel_name, twitter_handle, handle)
 
-            for video in live_videos:
-                video_id = video['video_id']
-                video_title = video['title']
-
-                if _already_posted(conn, video_id):
-                    logging.info('Already posted for video %s (@%s)', video_id, handle)
-                    continue
-
-                text = _build_tweet(channel_name, video_title, video_id, twitter_handle)
-                try:
-                    result = post_tweet(text)
-                    tweet_id = result.get('data', {}).get('id')
-                    _record_posted(conn, channel_id, video_id, tweet_id)
-                    logging.info('Posted tweet %s for video %s (@%s)', tweet_id, video_id, handle)
-                except Exception as exc:
-                    logging.error('Failed to post tweet for video %s: %s', video_id, exc)
     finally:
         conn.close()
