@@ -65,6 +65,10 @@ def _check_live_url(channel_id):
         logging.warning('YouTube redirected to consent/login for %s — blocked', channel_id)
         return False, True
 
+    if channel_id not in resp.text:
+        logging.warning('Channel ID not found in live page for %s — possible silent block', channel_id)
+        return False, True
+
     return '"isLive":true' in resp.text, False
 
 
