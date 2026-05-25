@@ -6,8 +6,9 @@ import requests
 from . import db
 from .x_api import post_tweet
 
-_SEARCH_URL = 'https://www.googleapis.com/youtube/v3/search'
 _CHANNELS_URL = 'https://www.googleapis.com/youtube/v3/channels'
+_PLAYLIST_ITEMS_URL = 'https://www.googleapis.com/youtube/v3/playlistItems'
+_VIDEOS_URL = 'https://www.googleapis.com/youtube/v3/videos'
 _MAX_TITLE_LEN = 100
 
 
@@ -88,6 +89,45 @@ def _resolve_new_handles(conn, handles, known):
     return result
 
 
+def _get_recent_video_ids(channel_id):
+    # uploads playlist ID = channel ID with UC → UU (1 quota unit)
+    playlist_id = 'UU' + channel_id[2:]
+    resp = requests.get(
+        _PLAYLIST_ITEMS_URL,
+        params={
+            'part': 'contentDetails',
+            'playlistId': playlist_id,
+            'maxResults': 15,
+            'key': os.environ['YOUTUBE_API_KEY'],
+        },
+        timeout=15,
+    )
+    resp.raise_for_status()
+    return [
+        item['contentDetails']['videoId']
+        for item in resp.json().get('items', [])
+    ]
+
+
+def _check_live_videos(video_ids):
+    # Single videos.list call (1 quota unit) covers all IDs
+    resp = requests.get(
+        _VIDEOS_URL,
+        params={
+            'part': 'snippet,liveStreamingDetails',
+            'id': ','.join(video_ids),
+            'key': os.environ['YOUTUBE_API_KEY'],
+        },
+        timeout=15,
+    )
+    resp.raise_for_status()
+    live = []
+    for item in resp.json().get('items', []):
+        if item.get('snippet', {}).get('liveBroadcastContent') == 'live':
+            live.append({'video_id': item['id'], 'title': item['snippet'].get('title', '')})
+    return live
+
+
 def _already_posted(conn, video_id):
     with db.dict_cursor(conn) as cur:
         cur.execute('SELECT id FROM ylive_posted WHERE video_id = %s', (video_id,))
@@ -102,19 +142,6 @@ def _record_posted(conn, channel_id, video_id, tweet_id):
             (channel_id, video_id, tweet_id),
         )
     conn.commit()
-
-
-def _get_live_streams(channel_id):
-    params = {
-        'part': 'snippet',
-        'channelId': channel_id,
-        'eventType': 'live',
-        'type': 'video',
-        'key': os.environ['YOUTUBE_API_KEY'],
-    }
-    resp = requests.get(_SEARCH_URL, params=params, timeout=15)
-    resp.raise_for_status()
-    return resp.json().get('items', [])
 
 
 def _build_tweet(channel_name, video_title, video_id):
@@ -146,14 +173,23 @@ def run_once():
             channel_name = row['channel_name'] or handle
 
             try:
-                streams = _get_live_streams(channel_id)
+                video_ids = _get_recent_video_ids(channel_id)
             except Exception as exc:
-                logging.error('YouTube API error for @%s: %s', handle, exc)
+                logging.error('playlistItems error for @%s: %s', handle, exc)
                 continue
 
-            for stream in streams:
-                video_id = stream['id']['videoId']
-                video_title = stream['snippet'].get('title', '')
+            if not video_ids:
+                continue
+
+            try:
+                live_videos = _check_live_videos(video_ids)
+            except Exception as exc:
+                logging.error('videos.list error for @%s: %s', handle, exc)
+                continue
+
+            for video in live_videos:
+                video_id = video['video_id']
+                video_title = video['title']
 
                 if _already_posted(conn, video_id):
                     logging.info('Already posted for video %s (@%s)', video_id, handle)
