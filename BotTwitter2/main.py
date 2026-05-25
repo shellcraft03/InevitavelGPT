@@ -17,6 +17,7 @@ logging.basicConfig(
 
 try:
     from InevitavelGPT2.worker import run_once
+    from InevitavelGPT2 import youtube_live
 except BaseException as exc:
     logging.critical('Falha ao importar worker: %s', exc)
     traceback.print_exc(file=sys.stdout)
@@ -66,7 +67,12 @@ if __name__ == '__main__':
         try:
             run_once()
         except BaseException as exc:
-            logging.error('Erro: %s', exc)
+            logging.error('Erro worker: %s', exc)
+            traceback.print_exc(file=sys.stdout)
+        try:
+            youtube_live.run_once()
+        except BaseException as exc:
+            logging.error('Erro youtube_live: %s', exc)
             traceback.print_exc(file=sys.stdout)
         sys.stdout.flush()
         time.sleep(INTERVAL_SECONDS)
