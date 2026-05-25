@@ -187,6 +187,10 @@ def run_once():
                 logging.error('videos.list error for @%s: %s', handle, exc)
                 continue
 
+            if not live_videos:
+                logging.info('No live stream for @%s', handle)
+                continue
+
             for video in live_videos:
                 video_id = video['video_id']
                 video_title = video['title']
