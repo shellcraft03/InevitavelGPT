@@ -1,6 +1,5 @@
 import logging
 import os
-import re
 
 import requests
 
@@ -45,57 +44,28 @@ def _load_channels(conn):
 
 
 def _check_live_url(channel_id):
-    """Check if channel is live by parsing the /live page HTML.
+    """Check if channel is live via the /live page HTML.
 
-    Returns (is_live, video_id, blocked).
-    blocked=True means YouTube rejected the request — fall back to API.
+    Returns (is_live, blocked).
+    blocked=True means YouTube rejected the request — fall back to API without pre-check.
     """
     url = _LIVE_URL.format(channel_id=channel_id)
     try:
         resp = requests.get(url, headers=_LIVE_CHECK_HEADERS, allow_redirects=True, timeout=15)
     except Exception as exc:
         logging.warning('Live URL request failed for %s: %s', channel_id, exc)
-        return False, None, True
+        return False, True
 
     if resp.status_code in (403, 429):
         logging.warning('YouTube blocked live URL check for %s (HTTP %s)', channel_id, resp.status_code)
-        return False, None, True
+        return False, True
 
     final_url = resp.url
     if 'consent' in final_url or 'accounts.google' in final_url:
         logging.warning('YouTube redirected to consent/login for %s — blocked', channel_id)
-        return False, None, True
+        return False, True
 
-    if '"isLive":true' not in resp.text:
-        return False, None, False
-
-    match = (
-        re.search(r'"videoId":"([a-zA-Z0-9_-]{11})"[^}]{0,200}"isLive":true', resp.text)
-        or re.search(r'"isLive":true[^}]{0,200}"videoId":"([a-zA-Z0-9_-]{11})"', resp.text)
-    )
-    if not match:
-        logging.warning('Live detected for %s but could not extract video ID — falling back to API', channel_id)
-        return False, None, True
-
-    return True, match.group(1), False
-
-
-def _get_video_title(video_id):
-    # 1 quota unit
-    resp = requests.get(
-        _VIDEOS_URL,
-        params={
-            'part': 'snippet',
-            'id': video_id,
-            'key': os.environ['YOUTUBE_API_KEY'],
-        },
-        timeout=15,
-    )
-    resp.raise_for_status()
-    items = resp.json().get('items', [])
-    if not items:
-        return ''
-    return items[0]['snippet'].get('title', '')
+    return '"isLive":true' in resp.text, False
 
 
 def _get_live_videos_api(channel_id):
@@ -197,33 +167,24 @@ def run_once():
             channel_name = row['channel_name'] or handle
             twitter_handle = row['twitter_handle']
 
-            is_live, video_id, blocked = _check_live_url(channel_id)
+            is_live, blocked = _check_live_url(channel_id)
 
-            if blocked:
-                # Fall back to API-based detection
-                try:
-                    live_videos = _get_live_videos_api(channel_id)
-                except Exception as exc:
-                    logging.error('API fallback error for @%s: %s', handle, exc)
-                    continue
-                if not live_videos:
-                    logging.info('No live stream for @%s (API fallback)', handle)
-                    continue
-                _process_live_videos(conn, live_videos, channel_id, channel_name, twitter_handle, handle)
-                continue
-
-            if not is_live:
+            if not blocked and not is_live:
                 logging.info('No live stream for @%s', handle)
                 continue
 
-            # Live detected via URL redirect — fetch title (1 quota unit)
+            # Live confirmed (or pre-check blocked) — use API to get video details
             try:
-                title = _get_video_title(video_id)
+                live_videos = _get_live_videos_api(channel_id)
             except Exception as exc:
-                logging.error('videos.list error for @%s: %s', handle, exc)
+                logging.error('API error for @%s: %s', handle, exc)
                 continue
 
-            _process_live_videos(conn, [{'video_id': video_id, 'title': title}], channel_id, channel_name, twitter_handle, handle)
+            if not live_videos:
+                logging.info('No live stream for @%s', handle)
+                continue
+
+            _process_live_videos(conn, live_videos, channel_id, channel_name, twitter_handle, handle)
 
     finally:
         conn.close()
