@@ -25,6 +25,7 @@ def _ensure_tables(conn):
             )
         """)
         cur.execute("ALTER TABLE ylive_channels ADD COLUMN IF NOT EXISTS twitter_handle TEXT")
+        cur.execute("ALTER TABLE ylive_channels ADD COLUMN IF NOT EXISTS currently_live BOOLEAN DEFAULT FALSE")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS ylive_posted (
                 id SERIAL PRIMARY KEY,
@@ -39,8 +40,17 @@ def _ensure_tables(conn):
 
 def _load_channels(conn):
     with db.dict_cursor(conn) as cur:
-        cur.execute('SELECT handle, channel_id, channel_name, twitter_handle FROM ylive_channels')
+        cur.execute('SELECT handle, channel_id, channel_name, twitter_handle, currently_live FROM ylive_channels')
         return cur.fetchall()
+
+
+def _set_live_state(conn, channel_id, live):
+    with conn.cursor() as cur:
+        cur.execute(
+            'UPDATE ylive_channels SET currently_live = %s WHERE channel_id = %s',
+            (live, channel_id),
+        )
+    conn.commit()
 
 
 def _check_live_url(channel_id):
@@ -170,11 +180,20 @@ def run_once():
             channel_id = row['channel_id']
             channel_name = row['channel_name'] or handle
             twitter_handle = row['twitter_handle']
+            was_live = row['currently_live']
 
             is_live, blocked = _check_live_url(channel_id)
 
             if not blocked and not is_live:
-                logging.info('No live stream for @%s', handle)
+                if was_live:
+                    _set_live_state(conn, channel_id, False)
+                    logging.info('Live ended for @%s', handle)
+                else:
+                    logging.info('No live stream for @%s', handle)
+                continue
+
+            if not blocked and is_live and was_live:
+                logging.info('Still live: %s (@%s) — skipping API call', channel_name, handle)
                 continue
 
             # Live confirmed (or pre-check blocked) — use API to get video details
@@ -185,9 +204,11 @@ def run_once():
                 continue
 
             if not live_videos:
+                _set_live_state(conn, channel_id, False)
                 logging.info('No live stream for @%s', handle)
                 continue
 
+            _set_live_state(conn, channel_id, True)
             _process_live_videos(conn, live_videos, channel_id, channel_name, twitter_handle, handle)
 
     finally:
