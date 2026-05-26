@@ -70,10 +70,7 @@ def _check_live_url(channel_id, handle):
         logging.warning('Channel ID not found in live page for %s — possible silent block', channel_id)
         return False, True
 
-    has_is_live = '"isLive":true' in resp.text
-    has_is_live_now = '"isLiveNow":true' in resp.text
-    logging.info('@%s html signals — isLive=%s isLiveNow=%s', handle, has_is_live, has_is_live_now)
-    return has_is_live, False
+    return '"isLive":true' in resp.text, False
 
 
 def _get_live_videos_api(channel_id):
