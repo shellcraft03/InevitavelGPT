@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 from InevitavelGPT2.youtube_live import (
     _check_live_url,
     _build_tweet,
@@ -20,6 +20,16 @@ def _mock_response(text='', status_code=200, url='https://www.youtube.com/channe
     r.url = url
     r.ok = status_code < 400
     return r
+
+
+def _channel(handle='ch1', channel_id=_CHANNEL_ID, channel_name='Canal 1', twitter_handle=None, currently_live=False):
+    return {
+        'handle': handle,
+        'channel_id': channel_id,
+        'channel_name': channel_name,
+        'twitter_handle': twitter_handle,
+        'currently_live': currently_live,
+    }
 
 
 class TestCheckLiveUrl:
@@ -158,37 +168,37 @@ class TestRunOnce:
             mock_check.assert_not_called()
 
     def test_skips_channel_when_not_live_and_not_blocked(self):
-        channels = [{'handle': 'ch1', 'channel_id': _CHANNEL_ID, 'channel_name': 'Canal 1', 'twitter_handle': None}]
         with patch(f'{_MOD}.db.connect', return_value=self._make_conn()), \
              patch(f'{_MOD}._ensure_tables'), \
-             patch(f'{_MOD}._load_channels', return_value=channels), \
+             patch(f'{_MOD}._load_channels', return_value=[_channel()]), \
              patch(f'{_MOD}._check_live_url', return_value=(False, False)), \
              patch(f'{_MOD}._get_live_videos_api') as mock_api:
             run_once()
             mock_api.assert_not_called()
 
     def test_calls_api_when_live_detected(self):
-        channels = [{'handle': 'ch1', 'channel_id': _CHANNEL_ID, 'channel_name': 'Canal 1', 'twitter_handle': None}]
         with patch(f'{_MOD}.db.connect', return_value=self._make_conn()), \
              patch(f'{_MOD}._ensure_tables'), \
-             patch(f'{_MOD}._load_channels', return_value=channels), \
+             patch(f'{_MOD}._load_channels', return_value=[_channel()]), \
              patch(f'{_MOD}._check_live_url', return_value=(True, False)), \
              patch(f'{_MOD}._get_live_videos_api', return_value=[]) as mock_api, \
+             patch(f'{_MOD}._set_live_state'), \
              patch(f'{_MOD}._process_live_videos') as mock_process:
             run_once()
             mock_api.assert_called_once_with(_CHANNEL_ID)
             mock_process.assert_not_called()
 
     def test_calls_process_when_live_videos_found(self):
-        channels = [{'handle': 'ch1', 'channel_id': _CHANNEL_ID, 'channel_name': 'Canal 1', 'twitter_handle': '@tw'}]
         live = [{'video_id': 'vidX', 'title': 'Live agora'}]
         with patch(f'{_MOD}.db.connect', return_value=self._make_conn()), \
              patch(f'{_MOD}._ensure_tables'), \
-             patch(f'{_MOD}._load_channels', return_value=channels), \
+             patch(f'{_MOD}._load_channels', return_value=[_channel(twitter_handle='@tw')]), \
              patch(f'{_MOD}._check_live_url', return_value=(True, False)), \
              patch(f'{_MOD}._get_live_videos_api', return_value=live), \
+             patch(f'{_MOD}._set_live_state') as mock_set, \
              patch(f'{_MOD}._process_live_videos') as mock_process:
             run_once()
+            mock_set.assert_called_once_with(mock_set.call_args[0][0], _CHANNEL_ID, True)
             mock_process.assert_called_once()
             args = mock_process.call_args[0]
             assert args[2] == _CHANNEL_ID
@@ -196,22 +206,63 @@ class TestRunOnce:
             assert args[4] == '@tw'
 
     def test_calls_api_when_blocked(self):
-        channels = [{'handle': 'ch1', 'channel_id': _CHANNEL_ID, 'channel_name': 'Canal 1', 'twitter_handle': None}]
         with patch(f'{_MOD}.db.connect', return_value=self._make_conn()), \
              patch(f'{_MOD}._ensure_tables'), \
-             patch(f'{_MOD}._load_channels', return_value=channels), \
+             patch(f'{_MOD}._load_channels', return_value=[_channel()]), \
              patch(f'{_MOD}._check_live_url', return_value=(False, True)), \
-             patch(f'{_MOD}._get_live_videos_api', return_value=[]) as mock_api:
+             patch(f'{_MOD}._get_live_videos_api', return_value=[]) as mock_api, \
+             patch(f'{_MOD}._set_live_state'):
             run_once()
             mock_api.assert_called_once_with(_CHANNEL_ID)
 
     def test_api_error_does_not_crash_run_once(self):
-        channels = [{'handle': 'ch1', 'channel_id': _CHANNEL_ID, 'channel_name': 'Canal 1', 'twitter_handle': None}]
         with patch(f'{_MOD}.db.connect', return_value=self._make_conn()), \
              patch(f'{_MOD}._ensure_tables'), \
-             patch(f'{_MOD}._load_channels', return_value=channels), \
+             patch(f'{_MOD}._load_channels', return_value=[_channel()]), \
              patch(f'{_MOD}._check_live_url', return_value=(True, False)), \
              patch(f'{_MOD}._get_live_videos_api', side_effect=Exception('API down')), \
              patch(f'{_MOD}._process_live_videos') as mock_process:
             run_once()
             mock_process.assert_not_called()
+
+    def test_skips_api_when_channel_already_live(self):
+        with patch(f'{_MOD}.db.connect', return_value=self._make_conn()), \
+             patch(f'{_MOD}._ensure_tables'), \
+             patch(f'{_MOD}._load_channels', return_value=[_channel(currently_live=True)]), \
+             patch(f'{_MOD}._check_live_url', return_value=(True, False)), \
+             patch(f'{_MOD}._get_live_videos_api') as mock_api:
+            run_once()
+            mock_api.assert_not_called()
+
+    def test_resets_state_when_live_ends(self):
+        with patch(f'{_MOD}.db.connect', return_value=self._make_conn()), \
+             patch(f'{_MOD}._ensure_tables'), \
+             patch(f'{_MOD}._load_channels', return_value=[_channel(currently_live=True)]), \
+             patch(f'{_MOD}._check_live_url', return_value=(False, False)), \
+             patch(f'{_MOD}._set_live_state') as mock_set, \
+             patch(f'{_MOD}._get_live_videos_api') as mock_api:
+            run_once()
+            mock_api.assert_not_called()
+            mock_set.assert_called_once_with(mock_set.call_args[0][0], _CHANNEL_ID, False)
+
+    def test_sets_live_true_in_db_after_first_detection(self):
+        live = [{'video_id': 'vidX', 'title': 'Live'}]
+        with patch(f'{_MOD}.db.connect', return_value=self._make_conn()), \
+             patch(f'{_MOD}._ensure_tables'), \
+             patch(f'{_MOD}._load_channels', return_value=[_channel()]), \
+             patch(f'{_MOD}._check_live_url', return_value=(True, False)), \
+             patch(f'{_MOD}._get_live_videos_api', return_value=live), \
+             patch(f'{_MOD}._set_live_state') as mock_set, \
+             patch(f'{_MOD}._process_live_videos'):
+            run_once()
+            mock_set.assert_called_once_with(mock_set.call_args[0][0], _CHANNEL_ID, True)
+
+    def test_calls_api_when_blocked_even_if_already_live(self):
+        with patch(f'{_MOD}.db.connect', return_value=self._make_conn()), \
+             patch(f'{_MOD}._ensure_tables'), \
+             patch(f'{_MOD}._load_channels', return_value=[_channel(currently_live=True)]), \
+             patch(f'{_MOD}._check_live_url', return_value=(False, True)), \
+             patch(f'{_MOD}._get_live_videos_api', return_value=[]) as mock_api, \
+             patch(f'{_MOD}._set_live_state'):
+            run_once()
+            mock_api.assert_called_once_with(_CHANNEL_ID)
