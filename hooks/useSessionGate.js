@@ -21,12 +21,12 @@ export function useSessionGate() {
           try {
             sessionStorage.removeItem('turnstileToken');
           } catch {}
-          router.replace('/');
+          router.replace(`/?from=${encodeURIComponent(router.asPath)}`);
           return;
         }
         setCheckingSession(false);
       } catch {
-        if (!cancelled) router.replace('/');
+        if (!cancelled) router.replace(`/?from=${encodeURIComponent(router.asPath)}`);
       }
     }
 
