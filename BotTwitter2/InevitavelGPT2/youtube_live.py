@@ -12,15 +12,6 @@ _LIVE_CHECK_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) 
 _MAX_TITLE_LEN = 100
 
 
-def _webshare_proxies():
-    user = os.environ.get('WEBSHARE_PROXY_USERNAME')
-    pwd = os.environ.get('WEBSHARE_PROXY_PASSWORD')
-    if not user or not pwd:
-        return None
-    proxy_url = f'http://{user}:{pwd}@p.webshare.io:80'
-    return {'http': proxy_url, 'https': proxy_url}
-
-
 def _ensure_tables(conn):
     with conn.cursor() as cur:
         cur.execute("""
@@ -49,17 +40,8 @@ def _ensure_tables(conn):
 
 def _load_channels(conn):
     with db.dict_cursor(conn) as cur:
-        cur.execute('SELECT handle, channel_id, channel_name, twitter_handle, currently_live FROM ylive_channels')
+        cur.execute('SELECT handle, channel_id, channel_name, twitter_handle FROM ylive_channels')
         return cur.fetchall()
-
-
-def _set_live_state(conn, channel_id, live):
-    with conn.cursor() as cur:
-        cur.execute(
-            'UPDATE ylive_channels SET currently_live = %s WHERE channel_id = %s',
-            (live, channel_id),
-        )
-    conn.commit()
 
 
 def _check_live_url(channel_id, handle):
@@ -70,7 +52,7 @@ def _check_live_url(channel_id, handle):
     """
     url = _LIVE_URL.format(handle=handle)
     try:
-        resp = requests.get(url, headers=_LIVE_CHECK_HEADERS, proxies=_webshare_proxies(), allow_redirects=True, timeout=15)
+        resp = requests.get(url, headers=_LIVE_CHECK_HEADERS, allow_redirects=True, timeout=15)
     except Exception as exc:
         logging.warning('Live URL request failed for %s: %s', channel_id, exc)
         return False, True
@@ -88,11 +70,11 @@ def _check_live_url(channel_id, handle):
         logging.warning('Channel ID not found in live page for %s — possible silent block', channel_id)
         return False, True
 
-    return '"isLiveNow":true' in resp.text, False
+    return '"isLive":true' in resp.text, False
 
 
 def _get_live_videos_api(channel_id):
-    """Fallback: playlistItems + videos.list (2 quota units)."""
+    """playlistItems + videos.list (2 quota units)."""
     playlist_id = 'UU' + channel_id[2:]
     resp = requests.get(
         'https://www.googleapis.com/youtube/v3/playlistItems',
@@ -156,15 +138,12 @@ def _build_tweet(channel_name, video_title, video_id, twitter_handle=None):
 
 
 def _process_live_videos(conn, live_videos, channel_id, channel_name, twitter_handle, handle):
-    """Returns True if at least one tweet was dispatched or was already posted."""
-    handled = False
     for video in live_videos:
         video_id = video['video_id']
         video_title = video['title']
 
         if _already_posted(conn, video_id):
             logging.info('Already posted for video %s (@%s)', video_id, handle)
-            handled = True
             continue
 
         text = _build_tweet(channel_name, video_title, video_id, twitter_handle)
@@ -173,10 +152,8 @@ def _process_live_videos(conn, live_videos, channel_id, channel_name, twitter_ha
             tweet_id = result.get('data', {}).get('id')
             _record_posted(conn, channel_id, video_id, tweet_id)
             logging.info('Posted tweet %s for video %s (@%s)', tweet_id, video_id, handle)
-            handled = True
         except Exception as exc:
             logging.error('Failed to post tweet for video %s: %s', video_id, exc)
-    return handled
 
 
 def run_once():
@@ -194,24 +171,15 @@ def run_once():
             channel_id = row['channel_id']
             channel_name = row['channel_name'] or handle
             twitter_handle = row['twitter_handle']
-            was_live = row['currently_live']
 
             is_live, blocked = _check_live_url(channel_id, handle)
-            logging.info('@%s check — is_live=%s was_live=%s blocked=%s', handle, is_live, was_live, blocked)
+            logging.info('@%s check — is_live=%s blocked=%s', handle, is_live, blocked)
 
             if not blocked and not is_live:
-                if was_live:
-                    _set_live_state(conn, channel_id, False)
-                    logging.info('Live ended for @%s', handle)
-                else:
-                    logging.info('No live stream for @%s', handle)
+                logging.info('No live stream for @%s', handle)
                 continue
 
-            if not blocked and is_live and was_live:
-                logging.info('Still live: %s (@%s) — skipping API call', channel_name, handle)
-                continue
-
-            # Live confirmed (or pre-check blocked) — use API to get video details
+            # is_live=True or blocked → call API to confirm and get video details
             try:
                 live_videos = _get_live_videos_api(channel_id)
             except Exception as exc:
@@ -219,12 +187,10 @@ def run_once():
                 continue
 
             if not live_videos:
-                _set_live_state(conn, channel_id, False)
-                logging.info('No live stream for @%s', handle)
+                logging.info('No live stream for @%s (API)', handle)
                 continue
 
-            if _process_live_videos(conn, live_videos, channel_id, channel_name, twitter_handle, handle):
-                _set_live_state(conn, channel_id, True)
+            _process_live_videos(conn, live_videos, channel_id, channel_name, twitter_handle, handle)
 
     finally:
         conn.close()
