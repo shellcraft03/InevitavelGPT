@@ -34,7 +34,7 @@ def _ensure_table(conn):
 
 def _list_channels(conn):
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute('SELECT handle, channel_name, twitter_handle FROM ylive_channels ORDER BY id')
+        cur.execute('SELECT handle, channel_id, channel_name, twitter_handle, currently_live FROM ylive_channels ORDER BY id')
         return cur.fetchall()
 
 
@@ -126,7 +126,8 @@ def _print_channels(channels):
         return
     for row in channels:
         tw = row['twitter_handle'] or '—'
-        print(f'  @{row["handle"]:30s} {row["channel_name"] or "":40s} twitter: {tw}')
+        live = '[AO VIVO]' if row.get('currently_live') else '         '
+        print(f'  {live} @{row["handle"]:30s} {row["channel_name"] or "":40s} twitter: {tw}')
 
 
 def main():
