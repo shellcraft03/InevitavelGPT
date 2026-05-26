@@ -132,6 +132,7 @@ livro-amarelo/
 │   ├── process_videos_ci.py         # CI: curation + indexing in a single pass (Python); blocks configured channels; prefers BR → US proxies
 │   ├── migrate_videos.mjs           # Create/update videos table in Neon
 │   ├── fetch_transcript.py          # Python helper for local transcription: youtube-transcript-api + Webshare proxy; called by curate_videos.mjs and index_youtube.mjs via spawnSync
+│   ├── yt_channel_id.py             # Utility: resolve YouTube handle → channel ID via channels.list API
 │   ├── curate_videos.mjs            # Curate pending videos via GPT-4.1-mini (local use)
 │   ├── index_youtube.mjs            # Transcription, speaker filter, chunking, embeddings → Pinecone (local use)
 │   ├── manage_videos.mjs            # Manual management: list, approve, reject and reset videos
@@ -157,15 +158,19 @@ livro-amarelo/
 │   ├── runtime.txt                  # python-3.11
 │   ├── requirements.txt
 │   ├── conftest.py                  # pytest fixtures: env vars for tests without real credentials
-│   ├── main.py                      # worker main loop
-│   ├── run-local-worker.bat          # loads local .env and runs the worker on Windows
+│   ├── main.py                      # worker main loop (mentions + YouTube live monitoring)
+│   ├── run-local-worker.bat          # loads BotTwitter2/.env and runs the worker on Windows
+│   ├── channels.bat                 # interactive interface to manage monitored YouTube channels
+│   ├── sync_channels.py             # CLI to add/remove entries in ylive_channels
 │   ├── tests/
-│   │   └── test_worker.py           # tests for _parse_tweet, _strip_accents and _error_code
+│   │   ├── test_worker.py           # tests for _parse_tweet, _strip_accents and _error_code
+│   │   └── test_youtube_live.py     # tests for _check_live_url, _build_tweet and run_once
 │   └── InevitavelGPT2/
 │       ├── api.py                   # calls /api/bot/answer and /api/bot/image
 │       ├── db.py                    # Neon connection
 │       ├── worker.py                # multi-user orchestration
-│       └── x_api.py                 # mention reads, media upload and reply
+│       ├── x_api.py                 # mention reads, media upload, reply and post_tweet
+│       └── youtube_live.py          # YouTube live monitor; posts tweet when a live stream is detected
 ├── __tests__/
 │   └── lib/
 │       ├── chat-utils.test.js       # tests for sanitize, normalize, intFromEnv, getIp, parseRankedIds
@@ -397,7 +402,7 @@ The `BotTwitter2/` directory contains the **Python worker** deployed on **Railwa
 
 The worker reads mentions to @Inevitavel_Bot via OAuth 1.0a and only processes tweets that contain the keyword configured in `INEVITAVEL_GPT_KEYWORD` together with "livro amarelo" or "renan santos", and whose author is in the list of approved accounts with sufficient balance. It then generates the RAG answer, creates the image, and publishes the reply from @Inevitavel_Bot.
 
-For local testing on Windows, configure `BotTwitter2/InevitavelGPT2/.env` and run `BotTwitter2/run-local-worker.bat`. The script can also load variables from the root `.env.local` when needed.
+For local testing on Windows, configure `BotTwitter2/.env` and run `BotTwitter2/run-local-worker.bat`.
 
 ### How it works
 
@@ -455,6 +460,7 @@ global cursor updated in igpt2_global_settings (bot_mentions_since_id)
 | `BOT_ACCESS_TOKEN` | Access Token for the @Inevitavel_Bot profile (OAuth 1.0a) |
 | `BOT_ACCESS_TOKEN_SECRET` | Access Token Secret for the @Inevitavel_Bot profile (OAuth 1.0a) |
 | `IGPT2_WORKER_INTERVAL_SECONDS` | Optional interval in seconds; defaults: local `60`, Railway `300` |
+| `YOUTUBE_API_KEY` | YouTube Data API v3 key; used by the live stream monitor |
 
 > `BOT_API_SECRET` must also be set in **Vercel** environment variables — it protects both `/api/bot/answer` and `/api/bot/image`.
 

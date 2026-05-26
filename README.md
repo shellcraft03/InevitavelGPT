@@ -132,6 +132,7 @@ livro-amarelo/
 │   ├── process_videos_ci.py         # CI: curadoria + indexação em passagem única (Python); bloqueia canais configurados; prefere proxies BR → US
 │   ├── migrate_videos.mjs           # Cria/atualiza tabela videos no Neon
 │   ├── fetch_transcript.py          # Helper Python para transcrição local: youtube-transcript-api + proxy Webshare; chamado por curate_videos.mjs e index_youtube.mjs via spawnSync
+│   ├── yt_channel_id.py             # Utilitário: resolve handle YouTube → channel ID via channels.list API
 │   ├── curate_videos.mjs            # Curadoria de vídeos pendentes por GPT-4.1-mini (uso local)
 │   ├── index_youtube.mjs            # Transcrição, filtro speaker, chunking, embeddings → Pinecone (uso local)
 │   ├── manage_videos.mjs            # Gestão manual: listar, aprovar, reprovar e resetar vídeos
@@ -157,15 +158,19 @@ livro-amarelo/
 │   ├── runtime.txt                  # python-3.11
 │   ├── requirements.txt
 │   ├── conftest.py                  # fixtures pytest: env vars para testes sem credenciais reais
-│   ├── main.py                      # loop principal do worker
-│   ├── run-local-worker.bat          # carrega .env local e executa o worker no Windows
+│   ├── main.py                      # loop principal do worker (menções + monitoramento YouTube)
+│   ├── run-local-worker.bat          # carrega BotTwitter2/.env e executa o worker no Windows
+│   ├── channels.bat                 # interface interativa para gerenciar canais monitorados no YouTube
+│   ├── sync_channels.py             # CLI para adicionar/remover entradas em ylive_channels
 │   ├── tests/
-│   │   └── test_worker.py           # testes de _parse_tweet, _strip_accents e _error_code
+│   │   ├── test_worker.py           # testes de _parse_tweet, _strip_accents e _error_code
+│   │   └── test_youtube_live.py     # testes de _check_live_url, _build_tweet e run_once
 │   └── InevitavelGPT2/
 │       ├── api.py                   # chama /api/bot/answer e /api/bot/image
 │       ├── db.py                    # conexão Neon
 │       ├── worker.py                # orquestração multiusuário
-│       └── x_api.py                 # leitura de menções, upload de mídia e reply
+│       ├── x_api.py                 # leitura de menções, upload de mídia, reply e post_tweet
+│       └── youtube_live.py          # monitoramento de lives YouTube; posta tweet ao detectar live
 ├── __tests__/
 │   └── lib/
 │       ├── chat-utils.test.js       # testes de sanitize, normaliza, intFromEnv, getIp, parseRankedIds
@@ -397,7 +402,7 @@ O diretório `BotTwitter2/` contém o **worker Python** implantado no **Railway*
 
 O worker lê menções ao @Inevitavel_Bot via OAuth 1.0a e só processa tweets que contenham a palavra-chave configurada em `INEVITAVEL_GPT_KEYWORD` junto com "livro amarelo" ou "renan santos", e cujo autor esteja na lista de contas aprovadas com saldo suficiente. Depois gera a resposta via RAG, cria a imagem e publica o reply pelo @Inevitavel_Bot.
 
-Para teste local no Windows, configure `BotTwitter2/InevitavelGPT2/.env` e execute `BotTwitter2/run-local-worker.bat`. O script também pode carregar variáveis do `.env.local` da raiz quando necessário.
+Para teste local no Windows, configure `BotTwitter2/.env` e execute `BotTwitter2/run-local-worker.bat`.
 
 ### Como funciona
 
@@ -455,6 +460,7 @@ cursor global atualizado em igpt2_global_settings (bot_mentions_since_id)
 | `BOT_ACCESS_TOKEN` | Access Token do perfil @Inevitavel_Bot (OAuth 1.0a) |
 | `BOT_ACCESS_TOKEN_SECRET` | Access Token Secret do perfil @Inevitavel_Bot (OAuth 1.0a) |
 | `IGPT2_WORKER_INTERVAL_SECONDS` | Intervalo opcional em segundos; padrão local `60`, Railway `300` |
+| `YOUTUBE_API_KEY` | Chave da YouTube Data API v3; usada pelo monitor de lives |
 
 > `BOT_API_SECRET` também deve estar definido nas variáveis de ambiente da **Vercel** — ele protege tanto `/api/bot/answer` quanto `/api/bot/image`.
 
