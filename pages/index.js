@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { useTurnstile } from '../hooks/useTurnstile';
 import { useDarkMode } from '../hooks/useDarkMode';
 import ShareBar from '../components/ShareBar';
@@ -38,6 +39,7 @@ function MoonIcon() {
 }
 
 export default function Entry() {
+  const router = useRouter();
   const [pendingToken, setPendingToken] = useState(null);
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState(null);
@@ -77,7 +79,9 @@ export default function Entry() {
         sessionStorage.setItem('turnstileToken', 'ok');
       } catch {
       }
-      window.location.assign('/inicio');
+      const from = router.query.from;
+      const dest = from && typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') ? from : '/inicio';
+      window.location.assign(dest);
     } catch {
       setVerifyError('Não foi possível verificar agora. Tente novamente.');
       setVerifying(false);
