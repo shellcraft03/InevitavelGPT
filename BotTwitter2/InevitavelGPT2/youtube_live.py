@@ -7,7 +7,7 @@ from . import db
 from .x_api import post_tweet
 
 _VIDEOS_URL = 'https://www.googleapis.com/youtube/v3/videos'
-_LIVE_URL = 'https://www.youtube.com/channel/{channel_id}/live'
+_LIVE_URL = 'https://www.youtube.com/@{handle}/live'
 _LIVE_CHECK_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
 _MAX_TITLE_LEN = 100
 
@@ -53,13 +53,13 @@ def _set_live_state(conn, channel_id, live):
     conn.commit()
 
 
-def _check_live_url(channel_id):
+def _check_live_url(channel_id, handle):
     """Check if channel is live via the /live page HTML.
 
     Returns (is_live, blocked).
     blocked=True means YouTube rejected the request — fall back to API without pre-check.
     """
-    url = _LIVE_URL.format(channel_id=channel_id)
+    url = _LIVE_URL.format(handle=handle)
     try:
         resp = requests.get(url, headers=_LIVE_CHECK_HEADERS, allow_redirects=True, timeout=15)
     except Exception as exc:
@@ -147,12 +147,15 @@ def _build_tweet(channel_name, video_title, video_id, twitter_handle=None):
 
 
 def _process_live_videos(conn, live_videos, channel_id, channel_name, twitter_handle, handle):
+    """Returns True if at least one tweet was dispatched or was already posted."""
+    handled = False
     for video in live_videos:
         video_id = video['video_id']
         video_title = video['title']
 
         if _already_posted(conn, video_id):
             logging.info('Already posted for video %s (@%s)', video_id, handle)
+            handled = True
             continue
 
         text = _build_tweet(channel_name, video_title, video_id, twitter_handle)
@@ -161,8 +164,10 @@ def _process_live_videos(conn, live_videos, channel_id, channel_name, twitter_ha
             tweet_id = result.get('data', {}).get('id')
             _record_posted(conn, channel_id, video_id, tweet_id)
             logging.info('Posted tweet %s for video %s (@%s)', tweet_id, video_id, handle)
+            handled = True
         except Exception as exc:
             logging.error('Failed to post tweet for video %s: %s', video_id, exc)
+    return handled
 
 
 def run_once():
@@ -182,7 +187,8 @@ def run_once():
             twitter_handle = row['twitter_handle']
             was_live = row['currently_live']
 
-            is_live, blocked = _check_live_url(channel_id)
+            is_live, blocked = _check_live_url(channel_id, handle)
+            logging.info('@%s check — is_live=%s was_live=%s blocked=%s', handle, is_live, was_live, blocked)
 
             if not blocked and not is_live:
                 if was_live:
@@ -208,8 +214,8 @@ def run_once():
                 logging.info('No live stream for @%s', handle)
                 continue
 
-            _set_live_state(conn, channel_id, True)
-            _process_live_videos(conn, live_videos, channel_id, channel_name, twitter_handle, handle)
+            if _process_live_videos(conn, live_videos, channel_id, channel_name, twitter_handle, handle):
+                _set_live_state(conn, channel_id, True)
 
     finally:
         conn.close()
