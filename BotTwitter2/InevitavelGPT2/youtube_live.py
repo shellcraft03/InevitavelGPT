@@ -12,6 +12,15 @@ _LIVE_CHECK_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) 
 _MAX_TITLE_LEN = 100
 
 
+def _webshare_proxies():
+    user = os.environ.get('WEBSHARE_PROXY_USERNAME')
+    pwd = os.environ.get('WEBSHARE_PROXY_PASSWORD')
+    if not user or not pwd:
+        return None
+    proxy_url = f'http://{user}:{pwd}@p.webshare.io:80'
+    return {'http': proxy_url, 'https': proxy_url}
+
+
 def _ensure_tables(conn):
     with conn.cursor() as cur:
         cur.execute("""
@@ -61,7 +70,7 @@ def _check_live_url(channel_id, handle):
     """
     url = _LIVE_URL.format(handle=handle)
     try:
-        resp = requests.get(url, headers=_LIVE_CHECK_HEADERS, allow_redirects=True, timeout=15)
+        resp = requests.get(url, headers=_LIVE_CHECK_HEADERS, proxies=_webshare_proxies(), allow_redirects=True, timeout=15)
     except Exception as exc:
         logging.warning('Live URL request failed for %s: %s', channel_id, exc)
         return False, True
