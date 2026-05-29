@@ -6,11 +6,11 @@ const useClientLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : 
 
 // Adicionar novas páginas aqui — o nav atualiza automaticamente
 const PAGES = [
-  { href: '/inicio',                  label: 'O Plano'        },
   { href: '/renan-santos-responde',   label: 'Renan Responde' },
   { href: '/sentimento',              label: 'Eleições 2026'  },
   { href: '/missao-mg',               label: 'Missão MG'      },
   { href: '/inevitavelgpt2',          label: 'Bot X/Twitter'  },
+  { href: '/inicio',                  label: 'O Plano'        },
   { href: '/doacoes',                 label: 'Apoie'          },
   { href: '/sobre',                   label: 'Sobre'          },
   { href: '/privacidade',             label: 'Privacidade'    },
