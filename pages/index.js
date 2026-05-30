@@ -80,7 +80,7 @@ export default function Entry() {
       } catch {
       }
       const from = router.query.from;
-      const dest = from && typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') ? from : '/inicio';
+      const dest = from && typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') ? from : '/renan-santos-responde';
       window.location.assign(dest);
     } catch {
       setVerifyError('Não foi possível verificar agora. Tente novamente.');
